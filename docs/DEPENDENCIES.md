@@ -46,25 +46,49 @@
 - **@types/react-native**: TypeScript definitions
 - **babel-preset-expo**: Babel configuration for Expo
 
+## Added Dependencies (VisionCamera Migration)
+- ✅ **react-native-vision-camera**: ^4.6.4 - High-performance camera with frame processors
+- ✅ **react-native-fast-tflite**: ^1.6.1 - Native TensorFlow Lite for ML inference
+- ✅ **react-native-worklets-core**: ^1.5.0 - JavaScript worklets for frame processing
+- ✅ **vision-camera-resize-plugin**: ^3.2.0 - Frame resizing for ML input
+
 ## Removed Dependencies
 - ❌ **@ui-kitten/components** - Replaced with custom components
 - ❌ **@eva-design/eva** - Replaced with custom theme
 - ❌ **react-native-dotenv** - Using Expo's built-in env support
-- ❌ **react-native-vision-camera** - Not compatible with Expo managed
-- ❌ **react-native-video-processing** - Using Expo AV instead
-- ❌ **react-native-worklets-core** - Not needed with Expo
+- ❌ **@tensorflow/tfjs** - Replaced with native TensorFlow Lite
+- ❌ **@tensorflow/tfjs-react-native** - Replaced with native TensorFlow Lite
 
 ## Setup Instructions
 
 1. **Install dependencies**:
    ```bash
    cd frontend
-   npm install
+   npm install --legacy-peer-deps
    ```
 
-2. **Clear caches**:
+2. **Prebuild native projects** (required for VisionCamera):
    ```bash
-   npx expo start --clear
+   npx expo prebuild --clean
+   ```
+
+3. **Install iOS pods**:
+   ```bash
+   cd ios && pod install && cd ..
+   ```
+
+4. **Run on devices**:
+   ```bash
+   # iOS
+   npx expo run:ios
+   
+   # Android
+   npx expo run:android
+   ```
+
+5. **Development server**:
+   ```bash
+   npx expo start --dev-client
    ```
 
 3. **Initialize app systems**:

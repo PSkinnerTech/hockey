@@ -11,7 +11,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackScreenProps } from '../types/navigation';
 import { Button } from '../components/ui';
@@ -21,7 +21,7 @@ import { useCamera } from '../hooks/useCamera';
 import { handlePermissionFlow } from '../lib/camera/permissions';
 import { storage } from '../lib/storage/mmkv-setup';
 import { RecordingManager } from '../lib/camera/RecordingManager';
-import { useFrameProcessor, FrameData } from '../lib/camera/FrameProcessor';
+import { useVisionCameraProcessor, VisionDetectionResult } from '../lib/camera/VisionCameraProcessor';
 import {
   useRecordingStore,
   useRecordingStatus,
@@ -55,23 +55,23 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
   const recordingStore = useRecordingStore();
 
   // Refs
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<Camera>(null);
   const recordingManagerRef = useRef<RecordingManager | null>(null);
   const pulseAnimRef = useRef(new Animated.Value(1)).current;
 
-  // Camera permissions
-  const [permission, requestPermission] = useCameraPermissions();
-  const hasPermission = permission?.granted;
+  // Camera permissions and device
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
 
-  // Frame processor for ML
-  const frameProcessor = useFrameProcessor(
+  // VisionCamera frame processor for ML
+  const { frameProcessor, isModelLoaded } = useVisionCameraProcessor(
     {
-      targetFPS: 60,
+      targetFPS: 30, // Reduced for better performance
       detectionThreshold: 0.7,
       enableDebugging: __DEV__,
     },
     {
-      onDetection: (result) => {
+      onDetection: (result: VisionDetectionResult) => {
         recordingStore.updateDetection(result.confidence, result.detected);
       },
       onError: (error) => {
@@ -83,8 +83,8 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Initialize recording manager
   useEffect(() => {
-    if (cameraRef.current && !recordingManagerRef.current) {
-      recordingManagerRef.current = new RecordingManager(cameraRef as React.RefObject<CameraView>, {
+    if (cameraRef.current && !recordingManagerRef.current && device) {
+      recordingManagerRef.current = new RecordingManager(cameraRef as React.RefObject<Camera>, {
         maxDuration: RECORDING_MAX_DURATION,
         quality: 'high',
         audioEnabled: true,
@@ -147,8 +147,8 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const checkAndRequestPermissions = async () => {
     if (!hasPermission) {
-      const result = await requestPermission();
-      if (!result?.granted) {
+      const granted = await requestPermission();
+      if (!granted) {
         Alert.alert(
           'Permissions Required',
           'Camera and microphone permissions are required to record videos.',
@@ -258,14 +258,7 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.goBack();
   }, [recordingStore, navigation, isRecording]);
 
-  const processFrame = useCallback(
-    (frameData: FrameData) => {
-      if (isRecording && mlOverlay) {
-        frameProcessor.processFrame(frameData);
-      }
-    },
-    [frameProcessor, isRecording, mlOverlay],
-  );
+  // VisionCamera frame processor is automatically applied when frameProcessor prop is set
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -273,16 +266,33 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Check if camera device is available
+  if (!device) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.centerContent,
+          { backgroundColor: colors.background.primary },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
+          Loading camera...
+        </Text>
+      </View>
+    );
+  }
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (recordingManagerRef.current) {
         recordingManagerRef.current.dispose();
       }
-      frameProcessor.dispose();
       recordingStore.resetRecording();
     };
-  }, [frameProcessor, recordingStore]);
+  }, [recordingStore]);
 
   if (!hasPermission) {
     return (
@@ -303,12 +313,14 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-      <CameraView
+      <Camera
         ref={cameraRef}
         style={styles.camera}
-        facing={facing}
-        flash={flash ? 'on' : 'off'}
-        enableTorch={flash}
+        device={device}
+        isActive={true}
+        video={true}
+        audio={true}
+        frameProcessor={mlOverlay ? frameProcessor : undefined}
       >
         {/* ML Overlay */}
         {mlOverlay && (
@@ -459,7 +471,7 @@ const RecordingScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
           </View>
         </View>
-      </CameraView>
+      </Camera>
     </View>
   );
 };

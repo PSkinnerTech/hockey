@@ -1,7 +1,7 @@
 import { RefObject } from 'react';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { CameraView } from 'expo-camera';
+import { Camera } from 'react-native-vision-camera';
 import {
   VideoConstraints,
   ML_OPTIMIZED_CONSTRAINTS,
@@ -45,7 +45,7 @@ export interface RecordingOptions {
 }
 
 export class RecordingManager {
-  private cameraRef: RefObject<CameraView>;
+  private cameraRef: RefObject<Camera>;
   private constraints: VideoConstraints;
   private recordingStartTime: number | null = null;
   private recordingTimer: NodeJS.Timeout | null = null;
@@ -58,7 +58,7 @@ export class RecordingManager {
   public onDurationUpdate?: (duration: number) => void;
   public onRecordingComplete?: (asset: VideoAsset) => void;
 
-  constructor(cameraRef: RefObject<CameraView>, options: RecordingOptions = {}) {
+  constructor(cameraRef: RefObject<Camera>, options: RecordingOptions = {}) {
     this.cameraRef = cameraRef;
     this.constraints = {
       ...ML_OPTIMIZED_CONSTRAINTS,
@@ -106,17 +106,20 @@ export class RecordingManager {
       const filename = generateVideoFilename();
       this.tempVideoPath = tempDir + filename;
 
-      // Start recording with optimal settings
-      const recordingOptions = {
-        maxDuration: this.constraints.maxDuration,
-        maxFileSize: this.constraints.maxFileSize,
-        videoBitrate: this.constraints.bitRate,
-        videoCodec: this.constraints.codec,
-        videoStabilizationMode: 'auto' as const,
-      };
-
-      // Start the recording
-      await this.cameraRef.current.recordAsync(recordingOptions);
+      // Start recording with VisionCamera
+      this.cameraRef.current.startRecording({
+        onRecordingFinished: (video) => {
+          this.tempVideoPath = video.path;
+          // Handle completion in stopRecording method
+        },
+        onRecordingError: (error) => {
+          this.onRecordingError?.({
+            code: 'RECORDING_FAILED',
+            message: error.message,
+            details: error,
+          });
+        },
+      });
 
       this.recordingStartTime = Date.now();
       this.startDurationTimer();
@@ -152,8 +155,8 @@ export class RecordingManager {
 
       this.stopDurationTimer();
 
-      // Stop recording
-      this.cameraRef.current.stopRecording();
+      // Stop recording with VisionCamera
+      await this.cameraRef.current.stopRecording();
 
       // Wait a bit for the file to be written
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -226,7 +229,7 @@ export class RecordingManager {
   async cancelRecording(): Promise<void> {
     try {
       if (this.cameraRef.current && this.recordingStartTime) {
-        this.cameraRef.current.stopRecording();
+        await this.cameraRef.current.stopRecording();
       }
 
       this.stopDurationTimer();

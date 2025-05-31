@@ -20,7 +20,8 @@
         "NSMicrophoneUsageDescription": "Smart Hockey Coach needs access to your microphone to record audio with your shot videos.",
         "NSPhotoLibraryUsageDescription": "Smart Hockey Coach needs access to your photo library to save recorded videos.",
         "NSPhotoLibraryAddUsageDescription": "Smart Hockey Coach needs permission to save recorded videos to your photo library."
-      }
+      },
+      "bundleIdentifier": "com.anonymous.frontend"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,8 +33,16 @@
         "CAMERA",
         "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET"
+      ],
+      "package": "com.anonymous.frontend"
     },
     "web": {
       "bundler": "metro",
@@ -43,9 +52,12 @@
     "plugins": [
       "expo-router",
       [
-        "expo-camera",
+        "react-native-vision-camera",
         {
-          "cameraPermission": "Allow Smart Hockey Coach to access your camera for recording shots."
+          "cameraPermissionText": "Smart Hockey Coach needs camera access to record your shots.",
+          "enableCameraPage": false,
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "Smart Hockey Coach needs microphone access to record audio with your shots."
         }
       ],
       [
