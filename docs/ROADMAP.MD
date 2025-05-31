@@ -5,15 +5,15 @@
 ### Environment Setup
 - [x] Create GCP account and enable billing
 - [x] Create Convex account (start with free tier)
-- [ ] Set up GitHub repository with branch protection
-- [ ] Install development tools (Node.js, React Native CLI, Android Studio, Xcode)
-- [ ] Create Apple Developer and Google Play Console accounts
+- [x] Set up GitHub repository with branch protection
+- [x] Install development tools (Node.js, React Native CLI, Android Studio, Xcode)
+- [x] Create Apple Developer and Google Play Console accounts
 
 ### Initial Configuration
-- [ ] Initialize React Native project: `npx react-native init SmartHockeyCoach --template react-native-template-typescript`
-- [ ] Set up Convex: `npx convex init`
-- [ ] Configure ESLint, Prettier, and Husky for code quality
-- [ ] Set up environment files (.env.development, .env.staging, .env.production)
+- [x] Initialize React Native project: `npx react-native init SmartHockeyCoach --template react-native-template-typescript`
+- [x] Set up Convex: `npx convex init`
+- [x] Configure ESLint, Prettier, and Husky for code quality
+- [x] Set up environment files (.env.development, .env.staging, .env.production)
 - [ ] Create basic CI/CD pipeline (GitHub Actions)
 
 ## Phase 1: MVP Foundation (Weeks 2-3)

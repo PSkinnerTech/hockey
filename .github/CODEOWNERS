@@ -1,0 +1,48 @@
+# CODEOWNERS for Smart Hockey Coach
+# This file defines who is responsible for code reviews in different parts of the codebase
+# When someone opens a pull request, these owners will be automatically requested for review
+
+# Default owners for everything in the repo
+*                               @pskinnertech
+
+# Frontend application
+/frontend/                      @pskinnertech
+/frontend/app/                  @pskinnertech
+/frontend/components/           @pskinnertech
+/frontend/hooks/                @pskinnertech
+/frontend/stores/               @pskinnertech
+/frontend/lib/                  @pskinnertech
+
+# Backend (Convex)
+/frontend/convex/               @pskinnertech
+/frontend/convex/schema.ts      @pskinnertech
+
+# Configuration files
+/.github/                       @pskinnertech
+/frontend/package.json          @pskinnertech
+/frontend/tsconfig.json         @pskinnertech
+/frontend/eslint.config.mjs     @pskinnertech
+/frontend/.prettierrc.json      @pskinnertech
+
+# Documentation
+/docs/                          @pskinnertech
+*.md                            @pskinnertech
+/README.md                      @pskinnertech
+/CLAUDE.md                      @pskinnertech
+
+# Security-sensitive files
+/frontend/.env*                 @pskinnertech
+/frontend/convex.json           @pskinnertech
+/.github/workflows/security.yml @pskinnertech
+
+# Build and deployment
+/.github/workflows/             @pskinnertech
+/frontend/android/              @pskinnertech
+/frontend/ios/                  @pskinnertech
+
+# Test files
+/frontend/**/*.test.ts          @pskinnertech
+/frontend/**/*.test.tsx         @pskinnertech
+/frontend/**/*.spec.ts          @pskinnertech
+/frontend/**/*.spec.tsx         @pskinnertech
+/frontend/__tests__/            @pskinnertech

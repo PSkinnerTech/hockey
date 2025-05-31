@@ -1,0 +1,83 @@
+version: 2
+updates:
+  # NPM dependencies for frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "pskinnertech"
+    labels:
+      - "dependencies"
+      - "javascript"
+    groups:
+      # Group all development dependencies
+      dev-dependencies:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "jest*"
+          - "*-test*"
+          - "husky"
+          - "lint-staged"
+      # Group React and React Native dependencies
+      react:
+        patterns:
+          - "react"
+          - "react-*"
+          - "@react-*"
+      # Group Expo dependencies
+      expo:
+        patterns:
+          - "expo"
+          - "expo-*"
+      # Group build tool dependencies
+      build-tools:
+        patterns:
+          - "@babel/*"
+          - "typescript"
+          - "metro-*"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+    # Security updates should be created immediately
+    allow:
+      - dependency-type: "all"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    reviewers:
+      - "pskinnertech"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Docker (for future use)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    reviewers:
+      - "pskinnertech"
+    labels:
+      - "dependencies"
+      - "docker"
+    # Only enable when Dockerfile exists
+    # Disabled for now to prevent errors
+    open-pull-requests-limit: 0
