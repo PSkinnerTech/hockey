@@ -1,0 +1,143 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Cursor Rules for Smart Hockey Coach
+
+## Overview
+
+This directory contains MDC (Markdown Domain Configuration) rules that guide AI code generation for the Smart Hockey Coach project. These rules prevent common antipatterns and enforce project-specific best practices.
+
+## Directory Structure
+
+```
+.cursor/
+├── config.mdc                    # Root configuration
+├── rules/
+│   ├── core/
+│   │   └── typescript-standards.mdc    # TypeScript best practices
+│   ├── framework/
+│   │   ├── react-native-patterns.mdc   # React Native patterns
+│   │   └── convex-patterns.mdc         # Convex integration
+│   ├── quality/
+│   │   └── prevent-antipatterns.mdc    # Anti-pattern prevention
+│   ├── domain/
+│   │   └── smart-hockey-coach.mdc      # Project-specific rules
+│   └── infrastructure/
+│       └── structured-logging.mdc       # Logging patterns
+└── README.md                     # This file
+```
+
+## How Rules Work
+
+1. **Automatic Application**: Rules apply automatically based on file patterns (globs)
+2. **Priority System**: Higher priority rules override lower ones (100 = highest)
+3. **Dependencies**: Rules can depend on other rules for composition
+4. **Always Apply**: Some rules apply to all code generation
+
+## Key Patterns Enforced
+
+### Error Handling
+```typescript
+// ✅ ALWAYS use Result pattern
+async function processVideo(): Promise<Result<ProcessedVideo, VideoError>> {
+  try {
+    const video = await process();
+    return Ok(video);
+  } catch (error) {
+    return Err(new VideoError(error.message));
+  }
+}
+
+// ❌ NEVER use plain try-catch without Result
+```
+
+### React Native Performance
+```typescript
+// ✅ ALWAYS memoize expensive components
+export const VideoPlayer = React.memo<VideoPlayerProps>(({ uri }) => {
+  // Component implementation
+});
+
+// ❌ NEVER create functions in render
+```
+
+### TypeScript Safety
+```typescript
+// ✅ ALWAYS use proper types
+const config: VideoConfig = { resolution: '720p' };
+
+// ❌ NEVER use any
+const config: any = { resolution: '720p' };
+```
+
+## Using These Rules
+
+1. **In Cursor**: Rules are automatically applied when generating code
+2. **Manual Reference**: Check relevant `.mdc` files when writing code manually
+3. **Testing**: Verify generated code follows the patterns
+4. **Updates**: Add new patterns as they emerge during development
+
+## Common Commands
+
+### Generate Component
+When asking Cursor to generate a component, it will automatically:
+- Use functional components with proper TypeScript
+- Apply React.memo where appropriate
+- Use proper hooks patterns
+- Include error boundaries
+
+### Generate Convex Function
+When generating Convex functions, Cursor will:
+- Use proper schema types
+- Implement authentication checks
+- Add input validation
+- Use Result pattern for errors
+
+### Generate Tests
+Test generation will include:
+- Proper mocking patterns
+- Type-safe test utilities
+- Performance benchmarks where needed
+
+## Troubleshooting
+
+### Rules Not Applying
+1. Check file path matches glob patterns
+2. Verify rule priority
+3. Check for syntax errors in MDC files
+
+### Conflicting Rules
+1. Higher priority rules win
+2. Use dependencies to compose rules
+3. Be specific with glob patterns
+
+### Performance Issues
+1. Limit glob patterns to necessary files
+2. Use targeted rules instead of global ones
+3. Keep rule content focused
+
+## Contributing
+
+When adding new rules:
+1. Follow existing MDC format
+2. Include clear examples (✅ and ❌)
+3. Set appropriate priority
+4. Test with actual code generation
+5. Document in this README
+
+## Best Practices
+
+1. **Be Specific**: Target rules to specific file types
+2. **Show Examples**: Always include good and bad examples
+3. **Explain Why**: Document the reasoning behind rules
+4. **Stay Updated**: Update rules as patterns evolve
+5. **Test Regularly**: Verify rules produce desired code
+
+## Resources
+
+- [Cursor Rules Documentation](https://docs.cursor.com/context/rules)
+- [TypeScript Best Practices](https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html)
+- [React Native Performance](https://reactnative.dev/docs/performance)
+- [Convex Best Practices](https://docs.convex.dev/production/best-practices)

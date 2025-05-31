@@ -1,0 +1,504 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Structured logging implementation for Smart Hockey Coach"
+globs: ["**/lib/logger.ts", "**/hooks/useLogger.ts", "**/convex/**/logger.ts"]
+dependencies: ["@core/typescript-standards.mdc"]
+priority: 75
+---
+
+# Structured Logging for Smart Hockey Coach
+
+## Logger Implementation
+
+### Base Logger Interface
+```typescript
+// ✅ Type-safe structured logger
+export interface LogContext {
+  // Request context
+  requestId: string;
+  userId?: string;
+  sessionId?: string;
+  
+  // Component context
+  component: string;
+  operation: string;
+  
+  // Platform context
+  platform: 'ios' | 'android' | 'web';
+  version: string;
+  environment: 'development' | 'staging' | 'production';
+  
+  // Custom metadata
+  metadata?: Record<string, unknown>;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  message: string;
+  context: LogContext;
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;
+    code?: string;
+  };
+  performance?: {
+    duration?: number;
+    memoryUsage?: number;
+  };
+}
+
+export abstract class BaseLogger {
+  constructor(protected baseContext: Partial<LogContext>) {}
+  
+  abstract log(entry: LogEntry): void;
+  
+  protected createEntry(
+    level: LogEntry['level'],
+    message: string,
+    context?: Partial<LogContext>
+  ): LogEntry {
+    return {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      context: {
+        ...this.baseContext,
+        ...context,
+        requestId: context?.requestId || this.baseContext.requestId || generateRequestId(),
+      } as LogContext,
+    };
+  }
+}
+```
+
+### React Native Logger
+```typescript
+// ✅ React Native specific logger
+import { Platform } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
+import crashlytics from '@react-native-firebase/crashlytics';
+
+export class ReactNativeLogger extends BaseLogger {
+  constructor() {
+    super({
+      platform: Platform.OS as 'ios' | 'android',
+      version: DeviceInfo.getVersion(),
+      environment: __DEV__ ? 'development' : 'production',
+    });
+  }
+  
+  log(entry: LogEntry): void {
+    // Development: Pretty print to console
+    if (__DEV__) {
+      const color = this.getLogColor(entry.level);
+      console.log(
+        `%c[${entry.level.toUpperCase()}] ${entry.message}`,
+        `color: ${color}`,
+        entry.context,
+        entry.error
+      );
+      return;
+    }
+    
+    // Production: Send to logging service
+    this.sendToLoggingService(entry);
+    
+    // Errors go to Crashlytics
+    if (entry.level === 'error' || entry.level === 'fatal') {
+      crashlytics().log(JSON.stringify(entry));
+      if (entry.error) {
+        crashlytics().recordError(new Error(entry.error.message));
+      }
+    }
+  }
+  
+  private sendToLoggingService(entry: LogEntry): void {
+    // Batch logs for performance
+    LogBatcher.add(entry);
+  }
+  
+  private getLogColor(level: LogEntry['level']): string {
+    const colors = {
+      debug: '#888',
+      info: '#2196F3',
+      warn: '#FF9800',
+      error: '#F44336',
+      fatal: '#9C27B0',
+    };
+    return colors[level];
+  }
+  
+  // Convenience methods
+  debug(message: string, context?: Partial<LogContext>): void {
+    this.log(this.createEntry('debug', message, context));
+  }
+  
+  info(message: string, context?: Partial<LogContext>): void {
+    this.log(this.createEntry('info', message, context));
+  }
+  
+  warn(message: string, context?: Partial<LogContext>): void {
+    this.log(this.createEntry('warn', message, context));
+  }
+  
+  error(message: string, error?: Error, context?: Partial<LogContext>): void {
+    const entry = this.createEntry('error', message, context);
+    if (error) {
+      entry.error = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        code: (error as any).code,
+      };
+    }
+    this.log(entry);
+  }
+}
+```
+
+### Convex Logger
+```typescript
+// ✅ Server-side logger for Convex
+export class ConvexLogger extends BaseLogger {
+  constructor(environment: string) {
+    super({
+      platform: 'web', // Convex runs in edge environment
+      version: process.env.CONVEX_DEPLOYMENT || 'unknown',
+      environment: environment as any,
+    });
+  }
+  
+  log(entry: LogEntry): void {
+    // Structured JSON output for log aggregation
+    console.log(JSON.stringify(entry));
+    
+    // Send to external service if configured
+    if (process.env.LOG_ENDPOINT) {
+      this.sendToExternalService(entry);
+    }
+  }
+  
+  private async sendToExternalService(entry: LogEntry): Promise<void> {
+    try {
+      await fetch(process.env.LOG_ENDPOINT!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
+    } catch (error) {
+      // Fail silently to avoid affecting main flow
+      console.error('Failed to send log', error);
+    }
+  }
+}
+```
+
+## Logger Hooks and Utilities
+
+### React Hook for Logging
+```typescript
+// ✅ Hook for component logging
+export function useLogger(component: string): ComponentLogger {
+  const requestId = useRequestId();
+  const userId = useUserId();
+  
+  const logger = useMemo(() => {
+    const baseLogger = new ReactNativeLogger();
+    
+    return {
+      log: (level: LogEntry['level'], message: string, metadata?: Record<string, unknown>) => {
+        baseLogger.log({
+          ...baseLogger.createEntry(level, message),
+          context: {
+            ...baseLogger.createEntry(level, message).context,
+            component,
+            operation: 'component',
+            requestId,
+            userId,
+            metadata,
+          },
+        });
+      },
+      
+      logOperation: (operation: string, fn: () => void | Promise<void>) => {
+        const start = performance.now();
+        const result = fn();
+        
+        if (result instanceof Promise) {
+          return result.finally(() => {
+            baseLogger.info(`${operation} completed`, {
+              component,
+              operation,
+              performance: { duration: performance.now() - start },
+            });
+          });
+        }
+        
+        baseLogger.info(`${operation} completed`, {
+          component,
+          operation,
+          performance: { duration: performance.now() - start },
+        });
+      },
+      
+      // Convenience methods
+      debug: (message: string, metadata?: Record<string, unknown>) => 
+        logger.log('debug', message, metadata),
+      info: (message: string, metadata?: Record<string, unknown>) => 
+        logger.log('info', message, metadata),
+      warn: (message: string, metadata?: Record<string, unknown>) => 
+        logger.log('warn', message, metadata),
+      error: (message: string, error?: Error, metadata?: Record<string, unknown>) => {
+        const entry = baseLogger.createEntry('error', message, {
+          component,
+          operation: 'component',
+          requestId,
+          userId,
+          metadata,
+        });
+        
+        if (error) {
+          entry.error = {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          };
+        }
+        
+        baseLogger.log(entry);
+      },
+    };
+  }, [component, requestId, userId]);
+  
+  return logger;
+}
+```
+
+### Log Batching for Performance
+```typescript
+// ✅ Batch logs to reduce network calls
+class LogBatcherClass {
+  private batch: LogEntry[] = [];
+  private timer: NodeJS.Timeout | null = null;
+  private readonly MAX_BATCH_SIZE = 50;
+  private readonly FLUSH_INTERVAL = 5000; // 5 seconds
+  
+  add(entry: LogEntry): void {
+    this.batch.push(entry);
+    
+    if (this.batch.length >= this.MAX_BATCH_SIZE) {
+      this.flush();
+    } else if (!this.timer) {
+      this.timer = setTimeout(() => this.flush(), this.FLUSH_INTERVAL);
+    }
+  }
+  
+  private async flush(): Promise<void> {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    
+    if (this.batch.length === 0) return;
+    
+    const logsToSend = [...this.batch];
+    this.batch = [];
+    
+    try {
+      await this.sendBatch(logsToSend);
+    } catch (error) {
+      // Re-queue failed logs
+      this.batch.unshift(...logsToSend);
+    }
+  }
+  
+  private async sendBatch(logs: LogEntry[]): Promise<void> {
+    const endpoint = getLoggingEndpoint();
+    if (!endpoint) return;
+    
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': getApiKey(),
+      },
+      body: JSON.stringify({ logs }),
+    });
+  }
+}
+
+export const LogBatcher = new LogBatcherClass();
+```
+
+## Domain-Specific Logging
+
+### Shot Analysis Logging
+```typescript
+// ✅ Specialized logging for shot analysis
+export function logShotAnalysis(
+  shotId: string,
+  stage: 'start' | 'ml_detection' | 'video_process' | 'api_call' | 'complete',
+  data: Record<string, unknown>
+): void {
+  const logger = new ReactNativeLogger();
+  
+  logger.info(`Shot analysis: ${stage}`, {
+    component: 'shot_analysis',
+    operation: stage,
+    metadata: {
+      shotId,
+      ...data,
+    },
+  });
+}
+
+// Usage example
+export async function analyzeShotWithLogging(video: VideoData): Promise<Result<Analysis>> {
+  const shotId = generateShotId();
+  const logger = useLogger('ShotAnalyzer');
+  
+  logShotAnalysis(shotId, 'start', { videoSize: video.size });
+  
+  try {
+    // ML Detection
+    const detectionTimer = logger.startTimer('ml_detection');
+    const detection = await mlModel.detectShot(video);
+    detectionTimer();
+    
+    if (!detection.success) {
+      logger.error('ML detection failed', detection.error);
+      return detection;
+    }
+    
+    logShotAnalysis(shotId, 'ml_detection', {
+      shotType: detection.data.type,
+      confidence: detection.data.confidence,
+    });
+    
+    // Continue with analysis...
+    
+  } catch (error) {
+    logger.error('Shot analysis failed', error as Error, { shotId });
+    return Err(error as Error);
+  }
+}
+```
+
+### Performance Logging
+```typescript
+// ✅ Performance monitoring with logging
+export class PerformanceLogger {
+  private static metrics = new Map<string, number[]>();
+  
+  static measure<T>(
+    operation: string,
+    fn: () => T | Promise<T>
+  ): T | Promise<T> {
+    const start = performance.now();
+    const logger = new ReactNativeLogger();
+    
+    try {
+      const result = fn();
+      
+      if (result instanceof Promise) {
+        return result.finally(() => {
+          this.recordMetric(operation, start, logger);
+        });
+      }
+      
+      this.recordMetric(operation, start, logger);
+      return result;
+      
+    } catch (error) {
+      logger.error(`Performance measurement failed: ${operation}`, error as Error);
+      throw error;
+    }
+  }
+  
+  private static recordMetric(
+    operation: string,
+    start: number,
+    logger: ReactNativeLogger
+  ): void {
+    const duration = performance.now() - start;
+    
+    // Store metric
+    const metrics = this.metrics.get(operation) || [];
+    metrics.push(duration);
+    if (metrics.length > 100) metrics.shift();
+    this.metrics.set(operation, metrics);
+    
+    // Log if slow
+    const threshold = PERFORMANCE_THRESHOLDS[operation];
+    if (threshold && duration > threshold) {
+      logger.warn(`Slow operation detected`, {
+        component: 'performance',
+        operation,
+        performance: {
+          duration,
+          threshold,
+          p95: this.calculateP95(metrics),
+        },
+      });
+    }
+  }
+  
+  private static calculateP95(values: number[]): number {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length * 0.95)] || 0;
+  }
+}
+```
+
+## Log Queries and Analysis
+
+```typescript
+// ✅ Helpers for analyzing logs
+export interface LogQuery {
+  level?: LogEntry['level'];
+  component?: string;
+  operation?: string;
+  userId?: string;
+  timeRange?: {
+    start: Date;
+    end: Date;
+  };
+}
+
+export async function queryLogs(query: LogQuery): Promise<LogEntry[]> {
+  // Implementation depends on logging backend
+  const filters = buildFilters(query);
+  const logs = await logStorage.query(filters);
+  return logs;
+}
+
+export async function analyzePerformance(
+  operation: string,
+  timeRange?: { start: Date; end: Date }
+): Promise<PerformanceAnalysis> {
+  const logs = await queryLogs({
+    operation,
+    timeRange,
+  });
+  
+  const durations = logs
+    .filter(log => log.performance?.duration)
+    .map(log => log.performance!.duration!);
+  
+  return {
+    count: durations.length,
+    avg: average(durations),
+    p50: percentile(durations, 0.5),
+    p95: percentile(durations, 0.95),
+    p99: percentile(durations, 0.99),
+    max: Math.max(...durations),
+    min: Math.min(...durations),
+  };
+}
+```

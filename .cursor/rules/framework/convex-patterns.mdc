@@ -1,0 +1,412 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Convex database and real-time patterns for Smart Hockey Coach"
+globs: ["**/convex/**/*.ts", "**/hooks/use*.ts", "**/lib/convex*.ts"]
+dependencies: ["@core/typescript-standards.mdc"]
+priority: 85
+---
+
+# Convex Patterns for Smart Hockey Coach
+
+## Schema Definition
+
+### Type-Safe Schema
+```typescript
+// ✅ ALWAYS: Define explicit schemas with proper types
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  users: defineTable({
+    email: v.string(),
+    name: v.string(),
+    preferences: v.object({
+      coachingStyle: v.union(
+        v.literal("technical"),
+        v.literal("motivational"),
+        v.literal("pro")
+      ),
+      defaultShotType: v.optional(v.union(
+        v.literal("wrist"),
+        v.literal("slap"),
+        v.literal("snapshot"),
+        v.literal("backhand")
+      )),
+    }),
+    stats: v.object({
+      totalShots: v.number(),
+      goalsScored: v.number(),
+      lastShotDate: v.optional(v.number()),
+    }),
+  })
+    .index("by_email", ["email"])
+    .index("by_last_shot", ["stats.lastShotDate"]),
+    
+  shots: defineTable({
+    userId: v.id("users"),
+    videoData: v.object({
+      fastPathUri: v.optional(v.string()),
+      fullPathUri: v.optional(v.string()),
+      duration: v.number(),
+      recordedAt: v.number(),
+    }),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("analyzing_fast"),
+      v.literal("analyzing_full"),
+      v.literal("completed"),
+      v.literal("error")
+    ),
+    error: v.optional(v.string()),
+  })
+    .index("by_user_and_time", ["userId", "videoData.recordedAt"])
+    .index("by_status", ["status"]),
+});
+
+// ✅ ALWAYS: Export generated types
+export type User = Doc<"users">;
+export type Shot = Doc<"shots">;
+export type ShotStatus = Shot["status"];
+```
+
+## Query Patterns
+
+### Efficient Queries
+```typescript
+// ✅ Use indexes for performance
+export const getUserRecentShots = query({
+  args: { 
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, limit = 10 }) => {
+    return await ctx.db
+      .query("shots")
+      .withIndex("by_user_and_time", q => 
+        q.eq("userId", userId)
+      )
+      .order("desc")
+      .take(limit);
+  },
+});
+
+// ✅ Paginated queries for large datasets
+export const getShotsPaginated = query({
+  args: {
+    userId: v.id("users"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, { userId, paginationOpts }) => {
+    return await ctx.db
+      .query("shots")
+      .withIndex("by_user_and_time", q => q.eq("userId", userId))
+      .order("desc")
+      .paginate(paginationOpts);
+  },
+});
+
+// ❌ AVOID: Scanning entire tables
+// ❌ AVOID: Multiple sequential queries in loops
+```
+
+### Real-time Subscriptions
+```typescript
+// ✅ Granular subscriptions
+export const getShotWithFeedback = query({
+  args: { shotId: v.id("shots") },
+  handler: async (ctx, { shotId }) => {
+    const shot = await ctx.db.get(shotId);
+    if (!shot) return null;
+    
+    // Only fetch feedback if shot is analyzed
+    if (shot.status === "completed") {
+      const feedback = await ctx.db
+        .query("feedbackResults")
+        .withIndex("by_shot", q => q.eq("shotId", shotId))
+        .unique();
+      
+      return { ...shot, feedback };
+    }
+    
+    return shot;
+  },
+});
+
+// ✅ Streaming updates
+export const watchShotAnalysis = query({
+  args: { shotId: v.id("shots") },
+  handler: async (ctx, { shotId }) => {
+    const shot = await ctx.db.get(shotId);
+    if (!shot) return null;
+    
+    // Return streaming data for real-time updates
+    return {
+      ...shot,
+      streamingData: shot.streamingData || null,
+    };
+  },
+});
+```
+
+## Mutation Patterns
+
+### Safe Mutations
+```typescript
+// ✅ Validate and sanitize inputs
+export const createShot = mutation({
+  args: {
+    videoData: v.object({
+      fastPathUri: v.optional(v.string()),
+      fullPathUri: v.optional(v.string()),
+      duration: v.number(),
+    }),
+    shotType: v.optional(v.union(
+      v.literal("wrist"),
+      v.literal("slap"),
+      v.literal("snapshot"),
+      v.literal("backhand")
+    )),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", q => q.eq("email", identity.email!))
+      .unique();
+    
+    if (!user) throw new Error("User not found");
+    
+    // Validate video duration
+    if (args.videoData.duration > 30) {
+      throw new Error("Video duration exceeds maximum of 30 seconds");
+    }
+    
+    const shotId = await ctx.db.insert("shots", {
+      userId: user._id,
+      videoData: {
+        ...args.videoData,
+        recordedAt: Date.now(),
+      },
+      status: "pending",
+      shotType: args.shotType,
+    });
+    
+    // Update user stats
+    await ctx.db.patch(user._id, {
+      stats: {
+        ...user.stats,
+        totalShots: user.stats.totalShots + 1,
+        lastShotDate: Date.now(),
+      },
+    });
+    
+    return shotId;
+  },
+});
+
+// ✅ Atomic operations
+export const updateShotStatus = mutation({
+  args: {
+    shotId: v.id("shots"),
+    status: v.union(
+      v.literal("analyzing_fast"),
+      v.literal("analyzing_full"),
+      v.literal("completed"),
+      v.literal("error")
+    ),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, { shotId, status, error }) => {
+    const shot = await ctx.db.get(shotId);
+    if (!shot) throw new Error("Shot not found");
+    
+    // Validate state transitions
+    const validTransitions: Record<string, string[]> = {
+      pending: ["analyzing_fast", "error"],
+      analyzing_fast: ["analyzing_full", "error"],
+      analyzing_full: ["completed", "error"],
+    };
+    
+    if (!validTransitions[shot.status]?.includes(status)) {
+      throw new Error(`Invalid status transition: ${shot.status} -> ${status}`);
+    }
+    
+    await ctx.db.patch(shotId, {
+      status,
+      ...(error && { error }),
+    });
+  },
+});
+```
+
+## Action Patterns
+
+### External API Integration
+```typescript
+// ✅ Actions for external calls with proper error handling
+export const analyzeShotWithGemini = action({
+  args: {
+    shotId: v.id("shots"),
+    videoUri: v.string(),
+    analysisType: v.union(v.literal("fast"), v.literal("full")),
+  },
+  handler: async (ctx, { shotId, videoUri, analysisType }): Promise<Result<void>> => {
+    try {
+      // Update status
+      await ctx.runMutation(api.shots.updateStatus, {
+        shotId,
+        status: analysisType === "fast" ? "analyzing_fast" : "analyzing_full",
+      });
+      
+      // Prepare Gemini request
+      const prompt = analysisType === "fast" 
+        ? buildFastPrompt() 
+        : buildFullPrompt();
+      
+      // Stream response from Gemini
+      const stream = await callGeminiStreaming({
+        videoUri,
+        prompt,
+        maxTokens: analysisType === "fast" ? 100 : 1500,
+      });
+      
+      // Process stream chunks
+      for await (const chunk of stream) {
+        await ctx.runMutation(api.streaming.appendChunk, {
+          shotId,
+          chunk,
+          type: analysisType,
+        });
+      }
+      
+      // Mark complete
+      await ctx.runMutation(api.shots.updateStatus, {
+        shotId,
+        status: analysisType === "full" ? "completed" : "analyzing_full",
+      });
+      
+      return Ok(undefined);
+    } catch (error) {
+      await ctx.runMutation(api.shots.updateStatus, {
+        shotId,
+        status: "error",
+        error: error.message,
+      });
+      
+      return Err(error);
+    }
+  },
+});
+
+// ✅ Scheduled actions
+export const scheduleAnalysis = internalMutation({
+  args: {
+    shotId: v.id("shots"),
+    delayMs: v.number(),
+  },
+  handler: async (ctx, { shotId, delayMs }) => {
+    await ctx.scheduler.runAfter(delayMs, api.analysis.analyzeShotWithGemini, {
+      shotId,
+      analysisType: "full",
+    });
+  },
+});
+```
+
+## Hook Patterns
+
+### Custom Convex Hooks
+```typescript
+// ✅ Typed hooks with loading states
+export function useShotAnalysis(shotId: Id<"shots">) {
+  const shot = useQuery(api.shots.getShotWithFeedback, { shotId });
+  const updateShot = useMutation(api.shots.update);
+  
+  return {
+    shot,
+    isLoading: shot === undefined,
+    error: shot?.status === "error" ? shot.error : null,
+    updateShot: useCallback(
+      (updates: Partial<Shot>) => updateShot({ shotId, ...updates }),
+      [shotId, updateShot]
+    ),
+  };
+}
+
+// ✅ Optimistic updates
+export function useOptimisticShot() {
+  const createShot = useMutation(api.shots.create).withOptimisticUpdate(
+    (localStore, args) => {
+      const optimisticShot: Shot = {
+        _id: "temp_" + Date.now(),
+        _creationTime: Date.now(),
+        userId: getCurrentUserId(),
+        status: "pending",
+        videoData: args.videoData,
+      };
+      
+      localStore.setQuery(api.shots.list, {}, (current) => [
+        optimisticShot,
+        ...current,
+      ]);
+    }
+  );
+  
+  return createShot;
+}
+```
+
+## File Storage
+
+```typescript
+// ✅ File upload with validation
+export const uploadVideo = mutation({
+  args: {
+    storageId: v.string(),
+    metadata: v.object({
+      duration: v.number(),
+      size: v.number(),
+      type: v.union(v.literal("fast"), v.literal("full")),
+    }),
+  },
+  handler: async (ctx, { storageId, metadata }) => {
+    // Validate file constraints
+    const maxSize = metadata.type === "fast" ? 1_048_576 : 5_242_880; // 1MB or 5MB
+    if (metadata.size > maxSize) {
+      throw new Error(`Video exceeds ${metadata.type} size limit`);
+    }
+    
+    // Generate URL
+    const url = await ctx.storage.getUrl(storageId);
+    if (!url) throw new Error("Failed to generate storage URL");
+    
+    return url;
+  },
+});
+```
+
+## Testing Patterns
+
+```typescript
+// ✅ Test utilities for Convex
+export const createTestConvexClient = () => {
+  return new ConvexClient("https://test.convex.cloud", {
+    // Mock auth
+    auth: {
+      getToken: async () => "test-token",
+    },
+  });
+};
+
+// ✅ Mock mutations
+export const mockMutations = {
+  createShot: jest.fn().mockResolvedValue("shot_123"),
+  updateStatus: jest.fn().mockResolvedValue(undefined),
+};
+```

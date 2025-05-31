@@ -1,0 +1,142 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Root configuration for Smart Hockey Coach cursor rules"
+alwaysApply: true
+priority: 100
+---
+
+# Smart Hockey Coach - Cursor Configuration
+
+## Project Overview
+
+This is a React Native + TypeScript + Convex application for real-time hockey shot analysis using Gemini 2.5 Pro AI. The app provides instant feedback on shooting technique through on-device ML and cloud-based AI analysis.
+
+## Active Rules
+
+The following rules are automatically applied based on file patterns:
+
+1. **Core TypeScript Standards** (`@core/typescript-standards.mdc`)
+   - Applies to: All `.ts` and `.tsx` files
+   - Enforces: Type safety, Result pattern, proper imports
+
+2. **React Native Patterns** (`@framework/react-native-patterns.mdc`)
+   - Applies to: Component and screen files
+   - Enforces: Performance optimizations, proper hooks usage
+
+3. **Convex Patterns** (`@framework/convex-patterns.mdc`)
+   - Applies to: Convex functions and database queries
+   - Enforces: Type-safe queries, proper mutations
+
+4. **Anti-Pattern Prevention** (`@quality/prevent-antipatterns.mdc`)
+   - Applies to: All TypeScript files
+   - Prevents: Common AI-generated mistakes
+
+5. **Domain Rules** (`@domain/smart-hockey-coach.mdc`)
+   - Applies to: All project files
+   - Enforces: Project-specific patterns and constants
+
+6. **Structured Logging** (`@infrastructure/structured-logging.mdc`)
+   - Applies to: Logger implementations
+   - Enforces: Consistent logging patterns
+
+## Code Generation Guidelines
+
+When generating code for this project:
+
+### ALWAYS:
+- Use the Result<T, E> pattern for error handling
+- Apply React.memo() to components with stable props
+- Use proper TypeScript types (never `any`)
+- Implement proper loading and error states
+- Add performance monitoring for critical paths
+- Use structured logging for debugging
+- Validate all user inputs
+- Handle offline scenarios gracefully
+
+### NEVER:
+- Use `any` type or `@ts-ignore`
+- Create inline functions in render methods
+- Skip authentication checks
+- Use synchronous operations that block the UI
+- Mutate state directly
+- Create memory leaks (always cleanup)
+- Use magic numbers or strings
+- Trust external input without validation
+
+## Key Technologies
+
+- **React Native**: 0.72+ with TypeScript
+- **State Management**: Zustand with subscribeWithSelector
+- **Backend**: Convex for real-time sync
+- **ML**: TensorFlow Lite for on-device shot detection
+- **AI**: Gemini 2.5 Pro via Vertex AI (production)
+- **Video**: react-native-camera with custom processing
+- **Navigation**: React Navigation v6
+- **UI**: React Native Reanimated 2 for animations
+
+## Performance Targets
+
+- Shot detection: <500ms
+- Fast feedback: <3 seconds
+- Full analysis: <15 seconds
+- UI animations: 60 FPS
+- App launch: <2 seconds
+
+## Project Structure
+
+```
+src/
+├── components/     # Reusable UI components
+├── screens/        # App screens
+├── hooks/          # Custom React hooks
+├── stores/         # Zustand stores
+├── lib/            # Utilities and helpers
+├── types/          # TypeScript definitions
+└── constants/      # App constants
+
+convex/
+├── schema.ts       # Database schema
+├── _generated/     # Auto-generated types
+└── [features]/     # Feature-based organization
+```
+
+## Testing Requirements
+
+- Unit test coverage: >80%
+- Integration tests for all API endpoints
+- E2E tests for critical user flows
+- Performance benchmarks for video processing
+- Load testing for Vertex AI endpoints
+
+## Security Considerations
+
+- All video data must be validated before processing
+- User authentication required for all operations
+- Implement proper rate limiting
+- Sanitize all inputs to prevent injection
+- Use secure storage for sensitive data
+- Implement certificate pinning for API calls
+
+## Monitoring and Logging
+
+- Use structured logging with request IDs
+- Track all performance metrics
+- Monitor error rates and types
+- Set up alerts for threshold violations
+- Implement user session tracking
+- Use Sentry for crash reporting
+
+## Development Workflow
+
+1. Check cursor rules before writing code
+2. Use Result pattern for all async operations
+3. Test on both iOS and Android devices
+4. Profile performance regularly
+5. Review generated code for anti-patterns
+6. Ensure accessibility compliance
+
+Remember: These rules are designed to prevent common mistakes and ensure consistent, high-quality code. When in doubt, refer to the specific rule files for detailed examples and patterns.

@@ -1,0 +1,369 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Prevent common AI-generated antipatterns in Smart Hockey Coach"
+globs: ["**/*.ts", "**/*.tsx", "!**/node_modules/**"]
+alwaysApply: true
+priority: 95
+---
+
+# Anti-Pattern Prevention for Smart Hockey Coach
+
+## TypeScript Anti-Patterns to PREVENT
+
+### Type System Abuse
+```typescript
+// ❌ NEVER: Use any type
+let data: any = fetchData(); // WRONG!
+
+// ✅ CORRECT: Use unknown or proper types
+let data: unknown = fetchData();
+// or
+let data: ShotAnalysisResult = await fetchData();
+
+// ❌ NEVER: Use type assertions without guards
+const user = data as User; // WRONG!
+
+// ✅ CORRECT: Validate before asserting
+if (isUser(data)) {
+  const user = data; // Type narrowed
+}
+
+// ❌ NEVER: Non-null assertions without checks
+const name = user!.name; // WRONG!
+
+// ✅ CORRECT: Guard against null/undefined
+const name = user?.name ?? 'Unknown';
+```
+
+### Poor Error Handling
+```typescript
+// ❌ NEVER: Catch without handling
+try {
+  await processVideo();
+} catch (e) {
+  console.log(e); // WRONG!
+}
+
+// ✅ CORRECT: Use Result pattern
+const result = await processVideo();
+if (!result.success) {
+  logger.error('Video processing failed', { error: result.error });
+  return showErrorToUser(result.error);
+}
+
+// ❌ NEVER: Throw strings
+throw "Error processing video"; // WRONG!
+
+// ✅ CORRECT: Throw proper errors
+throw new VideoProcessingError('Failed to extract frames', { cause: originalError });
+```
+
+### Async/Promise Anti-Patterns
+```typescript
+// ❌ NEVER: Unhandled promises
+videoProcessor.start(); // WRONG! Returns promise
+
+// ✅ CORRECT: Always handle promises
+videoProcessor.start()
+  .then(handleSuccess)
+  .catch(handleError);
+
+// ❌ NEVER: Sequential awaits when parallel is possible
+const fast = await analyzeFast(video); // WRONG!
+const full = await analyzeFull(video); // Takes longer
+
+// ✅ CORRECT: Parallel execution
+const [fast, full] = await Promise.all([
+  analyzeFast(video),
+  analyzeFull(video)
+]);
+
+// ❌ NEVER: async without await
+async function processShot() {
+  return api.createShot(); // WRONG! Pointless async
+}
+
+// ✅ CORRECT: Only use async when needed
+function processShot() {
+  return api.createShot();
+}
+```
+
+## React Native Anti-Patterns to PREVENT
+
+### Component Anti-Patterns
+```typescript
+// ❌ NEVER: setState in render
+function BadComponent() {
+  const [count, setCount] = useState(0);
+  if (count === 0) {
+    setCount(1); // WRONG! Infinite loop
+  }
+}
+
+// ✅ CORRECT: Use useEffect
+function GoodComponent() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (count === 0) {
+      setCount(1);
+    }
+  }, [count]);
+}
+
+// ❌ NEVER: Mutate state directly
+state.shots.push(newShot); // WRONG!
+setState(state); // Won't trigger re-render
+
+// ✅ CORRECT: Create new objects
+setState(prev => ({
+  ...prev,
+  shots: [...prev.shots, newShot]
+}));
+```
+
+### Performance Anti-Patterns
+```typescript
+// ❌ NEVER: Inline functions in render
+<FlatList
+  data={shots}
+  renderItem={({ item }) => ( // WRONG! New function every render
+    <ShotCard onPress={() => handlePress(item.id)} />
+  )}
+/>
+
+// ✅ CORRECT: Stable references
+const renderItem = useCallback(({ item }) => (
+  <ShotCard shot={item} onPress={handlePress} />
+), [handlePress]);
+
+<FlatList data={shots} renderItem={renderItem} />
+
+// ❌ NEVER: Expensive computations in render
+function BadComponent({ frames }) {
+  const processed = frames.map(processFrame); // WRONG! Every render
+  return <View>{processed}</View>;
+}
+
+// ✅ CORRECT: Memoize expensive operations
+function GoodComponent({ frames }) {
+  const processed = useMemo(
+    () => frames.map(processFrame),
+    [frames]
+  );
+  return <View>{processed}</View>;
+}
+```
+
+### Style Anti-Patterns
+```typescript
+// ❌ NEVER: Inline style objects
+<View style={{ flex: 1, padding: 20 }}> // WRONG! New object every render
+
+// ✅ CORRECT: Use StyleSheet
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20 }
+});
+<View style={styles.container}>
+
+// ❌ NEVER: Dynamic styles without memoization
+<View style={{
+  backgroundColor: isActive ? 'blue' : 'gray', // WRONG!
+  padding: 20
+}}>
+
+// ✅ CORRECT: Memoize dynamic styles
+const dynamicStyle = useMemo(() => ({
+  backgroundColor: isActive ? 'blue' : 'gray',
+  padding: 20
+}), [isActive]);
+```
+
+## Convex Anti-Patterns to PREVENT
+
+### Query Anti-Patterns
+```typescript
+// ❌ NEVER: N+1 queries
+const shots = await ctx.db.query("shots").collect();
+for (const shot of shots) {
+  const user = await ctx.db.get(shot.userId); // WRONG! N queries
+}
+
+// ✅ CORRECT: Batch fetch
+const shots = await ctx.db.query("shots").collect();
+const userIds = [...new Set(shots.map(s => s.userId))];
+const users = await Promise.all(userIds.map(id => ctx.db.get(id)));
+const userMap = new Map(users.map(u => [u._id, u]));
+
+// ❌ NEVER: Unbounded queries
+const allShots = await ctx.db.query("shots").collect(); // WRONG!
+
+// ✅ CORRECT: Always paginate or limit
+const recentShots = await ctx.db
+  .query("shots")
+  .order("desc")
+  .take(100);
+```
+
+### Mutation Anti-Patterns
+```typescript
+// ❌ NEVER: Non-atomic operations
+const user = await ctx.db.get(userId);
+user.stats.totalShots += 1; // WRONG! Mutating
+await ctx.db.replace(userId, user); // Race condition
+
+// ✅ CORRECT: Use patch for atomic updates
+await ctx.db.patch(userId, {
+  "stats.totalShots": increment(1)
+});
+
+// ❌ NEVER: Missing validation
+export const updateShot = mutation({
+  args: { shotId: v.id("shots"), data: v.any() }, // WRONG!
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.shotId, args.data);
+  }
+});
+
+// ✅ CORRECT: Validate all inputs
+export const updateShot = mutation({
+  args: {
+    shotId: v.id("shots"),
+    status: v.optional(v.union(...VALID_STATUSES)),
+    feedback: v.optional(v.object({...})),
+  },
+  handler: async (ctx, args) => {
+    // Validate business logic
+    const shot = await ctx.db.get(args.shotId);
+    if (!shot) throw new Error("Shot not found");
+    
+    // Safe update
+    await ctx.db.patch(args.shotId, args);
+  }
+});
+```
+
+## Security Anti-Patterns to PREVENT
+
+### Authentication/Authorization
+```typescript
+// ❌ NEVER: Skip auth checks
+export const deleteShot = mutation({
+  handler: async (ctx, { shotId }) => {
+    await ctx.db.delete(shotId); // WRONG! No auth
+  }
+});
+
+// ✅ CORRECT: Always verify permissions
+export const deleteShot = mutation({
+  handler: async (ctx, { shotId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    
+    const shot = await ctx.db.get(shotId);
+    if (!shot) throw new Error("Shot not found");
+    
+    const user = await getUserByEmail(ctx, identity.email);
+    if (shot.userId !== user._id) {
+      throw new Error("Forbidden");
+    }
+    
+    await ctx.db.delete(shotId);
+  }
+});
+```
+
+### Input Validation
+```typescript
+// ❌ NEVER: Trust client input
+const videoUrl = request.body.videoUrl;
+await processVideo(videoUrl); // WRONG! Could be malicious
+
+// ✅ CORRECT: Validate everything
+const videoUrl = request.body.videoUrl;
+if (!isValidVideoUrl(videoUrl)) {
+  throw new Error("Invalid video URL");
+}
+if (!isAllowedDomain(videoUrl)) {
+  throw new Error("Unauthorized domain");
+}
+await processVideo(videoUrl);
+```
+
+## Memory/Performance Anti-Patterns
+
+```typescript
+// ❌ NEVER: Memory leaks in React Native
+class VideoProcessor {
+  listeners: Array<() => void> = [];
+  
+  addListener(fn: () => void) {
+    this.listeners.push(fn); // WRONG! Never removed
+  }
+}
+
+// ✅ CORRECT: Always cleanup
+useEffect(() => {
+  const listener = () => console.log('frame');
+  processor.addListener(listener);
+  
+  return () => processor.removeListener(listener); // Cleanup
+}, []);
+
+// ❌ NEVER: Synchronous heavy operations
+function processVideo(data: Uint8Array): ProcessedVideo {
+  // WRONG! Blocks UI thread
+  for (let i = 0; i < data.length; i++) {
+    // Heavy processing
+  }
+}
+
+// ✅ CORRECT: Use async chunks or workers
+async function processVideo(data: Uint8Array): Promise<ProcessedVideo> {
+  const chunks = splitIntoChunks(data, 1000);
+  const results = [];
+  
+  for (const chunk of chunks) {
+    results.push(await processChunk(chunk));
+    // Allow UI to update
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  
+  return combineResults(results);
+}
+```
+
+## Code Style Anti-Patterns
+
+```typescript
+// ❌ NEVER: Magic numbers/strings
+if (feedback.confidence > 0.8) { // WRONG! What's 0.8?
+  return "high";
+}
+
+// ✅ CORRECT: Named constants
+const CONFIDENCE_THRESHOLDS = {
+  HIGH: 0.8,
+  MEDIUM: 0.5,
+  LOW: 0.2,
+} as const;
+
+if (feedback.confidence > CONFIDENCE_THRESHOLDS.HIGH) {
+  return "high";
+}
+
+// ❌ NEVER: Nested ternaries
+const status = isLoading ? 'loading' : isError ? 'error' : data ? 'success' : 'empty'; // WRONG!
+
+// ✅ CORRECT: Clear conditionals
+function getStatus() {
+  if (isLoading) return 'loading';
+  if (isError) return 'error';
+  if (data) return 'success';
+  return 'empty';
+}
+```

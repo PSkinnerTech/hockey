@@ -1,0 +1,207 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Core TypeScript standards for Smart Hockey Coach"
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+priority: 100
+---
+
+# TypeScript Standards for Smart Hockey Coach
+
+## Type System Rules
+
+### NEVER use these:
+- `any` type - use `unknown` or proper typing
+- `@ts-ignore` - fix the type issue instead
+- Non-null assertions `!` without proper guards
+- `as` type assertions except for specific DOM cases
+
+### ALWAYS prefer:
+```typescript
+// ✅ Proper typing with generics
+function processVideo<T extends VideoMetadata>(video: T): Result<ProcessedVideo, VideoError>
+
+// ✅ Type inference where possible
+const FAST_FEEDBACK_CONFIG = {
+  duration: { min: 0.5, max: 1.5 } as const,
+  maxTokens: 100
+} satisfies FastPathConfig;
+
+// ✅ Discriminated unions for state
+type FeedbackState = 
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'error'; error: Error }
+  | { status: 'success'; data: FeedbackData };
+```
+
+## Error Handling Pattern
+
+ALWAYS use the Result pattern for operations that can fail:
+
+```typescript
+// Define base Result type
+export type Result<T, E = Error> = 
+  | { success: true; data: T }
+  | { success: false; error: E };
+
+// Helper functions
+export const Ok = <T>(data: T): Result<T> => ({ success: true, data });
+export const Err = <E>(error: E): Result<never, E> => ({ success: false, error });
+
+// Usage example for video processing
+async function extractVideoSegment(
+  videoUri: string,
+  timestamps: ShotTimestamps
+): Promise<Result<VideoSegment, VideoProcessingError>> {
+  try {
+    const segment = await VideoProcessor.extract(videoUri, timestamps);
+    return Ok(segment);
+  } catch (error) {
+    return Err(new VideoProcessingError(error.message));
+  }
+}
+```
+
+## Import Organization
+
+Order imports consistently:
+1. React/React Native
+2. Third-party libraries  
+3. Convex imports
+4. Internal modules (@/...)
+5. Relative imports (./...)
+
+```typescript
+// ✅ Correct import order
+import React, { useCallback, useMemo } from 'react';
+import { View, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { useFeedbackStore } from '@/stores/feedback';
+import { VideoProcessor } from './VideoProcessor';
+```
+
+## Function Guidelines
+
+```typescript
+// ✅ Pure functions with explicit return types
+export function calculateShotMetrics(
+  frames: VideoFrame[]
+): ShotMetrics {
+  // implementation
+}
+
+// ✅ Async functions with Result pattern
+export async function analyzeShot(
+  video: VideoData
+): Promise<Result<ShotAnalysis>> {
+  // implementation
+}
+
+// ❌ NEVER: Side effects in pure functions
+// ❌ NEVER: Mutations of input parameters
+// ❌ NEVER: Implicit any returns
+```
+
+## Const Assertions and Enums
+
+```typescript
+// ✅ Use const assertions for literal types
+export const SHOT_TYPES = ['wrist', 'slap', 'snapshot', 'backhand'] as const;
+export type ShotType = typeof SHOT_TYPES[number];
+
+// ✅ Object literals with satisfies for type checking
+export const FEEDBACK_STAGES = {
+  INSTANT: { maxLatency: 500, source: 'device' },
+  FAST: { maxLatency: 3000, source: 'gemini-fast' },
+  FULL: { maxLatency: 15000, source: 'gemini-full' }
+} as const satisfies Record<string, FeedbackStageConfig>;
+
+// ❌ AVOID: String enums (use const assertions)
+// ❌ AVOID: Numeric enums (use const assertions)
+```
+
+## Type Guards and Narrowing
+
+```typescript
+// ✅ Type predicate functions
+export function isShotDetected(
+  detection: MLDetection
+): detection is ShotDetection {
+  return detection.type === 'shot' && detection.confidence > 0.8;
+}
+
+// ✅ Exhaustive checks
+function processFeedback(state: FeedbackState): string {
+  switch (state.status) {
+    case 'idle': return 'Waiting...';
+    case 'loading': return 'Analyzing...';
+    case 'error': return `Error: ${state.error.message}`;
+    case 'success': return state.data.summary;
+    default: {
+      const _exhaustive: never = state;
+      throw new Error(`Unhandled state: ${_exhaustive}`);
+    }
+  }
+}
+```
+
+## Utility Types
+
+Create project-specific utility types:
+
+```typescript
+// Deep readonly for configs
+export type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+// Nullable fields for partial data
+export type Nullable<T> = {
+  [P in keyof T]: T[P] | null;
+};
+
+// Required fields subset
+export type RequireFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
+```
+
+## Performance Considerations
+
+```typescript
+// ✅ Memoize expensive computations
+const processedFrames = useMemo(
+  () => frames.map(processFrame),
+  [frames]
+);
+
+// ✅ Use WeakMap for object metadata
+const videoMetadataCache = new WeakMap<VideoFile, VideoMetadata>();
+
+// ❌ AVOID: Creating objects/arrays in loops
+// ❌ AVOID: Synchronous heavy computations
+```
+
+## Testing Types
+
+```typescript
+// ✅ Type your test utilities
+export function createMockShot(
+  overrides?: Partial<Shot>
+): Shot {
+  return {
+    id: 'test-shot-id',
+    userId: 'test-user-id',
+    timestamp: Date.now(),
+    ...overrides
+  };
+}
+
+// ✅ Use type assertions sparingly in tests
+const mockResult = createMockResult() as Result<ShotAnalysis>;
+```

@@ -1,0 +1,362 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "React Native patterns and performance optimizations for Smart Hockey Coach"
+globs: ["**/*.tsx", "**/components/**/*.ts", "**/screens/**/*.ts"]
+dependencies: ["@core/typescript-standards.mdc"]
+priority: 90
+---
+
+# React Native Patterns for Smart Hockey Coach
+
+## Component Architecture
+
+### Functional Components Only
+```typescript
+// ✅ ALWAYS: Typed functional components
+interface ShotAnalysisProps {
+  shotId: string;
+  onComplete?: (analysis: ShotAnalysis) => void;
+}
+
+export const ShotAnalysis: React.FC<ShotAnalysisProps> = ({ 
+  shotId, 
+  onComplete 
+}) => {
+  // Component logic
+};
+
+// ❌ NEVER: Class components
+// ❌ NEVER: Untyped components
+```
+
+### Performance Optimization
+
+```typescript
+// ✅ Memoize expensive components
+export const VideoPlayback = React.memo<VideoPlaybackProps>(({ 
+  videoUri, 
+  timestamps 
+}) => {
+  // Component implementation
+}, (prevProps, nextProps) => {
+  // Custom comparison for video URI only
+  return prevProps.videoUri === nextProps.videoUri;
+});
+
+// ✅ Stable callbacks for lists
+const FeedbackList: React.FC<FeedbackListProps> = ({ items }) => {
+  const renderItem = useCallback(({ item }: { item: FeedbackItem }) => (
+    <FeedbackCard
+      key={item.id}
+      feedback={item}
+      onPress={handleItemPress}
+    />
+  ), [handleItemPress]);
+  
+  const keyExtractor = useCallback((item: FeedbackItem) => item.id, []);
+  
+  return (
+    <FlashList
+      data={items}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      estimatedItemSize={120}
+      getItemType={(item) => item.type} // For recycling
+    />
+  );
+};
+```
+
+## State Management Patterns
+
+### Local State Rules
+```typescript
+// ✅ Use proper state initialization
+const [isRecording, setIsRecording] = useState(false);
+const [shotData, setShotData] = useState<ShotData | null>(null);
+
+// ✅ State updates with proper typing
+const updateShotData = useCallback((data: Partial<ShotData>) => {
+  setShotData(prev => prev ? { ...prev, ...data } : null);
+}, []);
+
+// ❌ NEVER: Direct state mutations
+// ❌ NEVER: setState in render
+```
+
+### Global State (Zustand)
+```typescript
+// ✅ Typed store with selectors
+const useFeedbackStore = create<FeedbackStore>()(
+  subscribeWithSelector((set, get) => ({
+    // State
+    instantFeedback: null,
+    fastFeedback: { raw: '', parsed: null },
+    
+    // Actions with proper typing
+    appendFastChunk: (chunk: string) => set(state => ({
+      fastFeedback: {
+        ...state.fastFeedback,
+        raw: state.fastFeedback.raw + chunk,
+        parsed: tryParseFastFeedback(state.fastFeedback.raw + chunk)
+      }
+    })),
+  }))
+);
+
+// ✅ Granular subscriptions
+const shotOutcome = useFeedbackStore(
+  state => state.fastFeedback.parsed?.outcome
+);
+```
+
+## Native Module Integration
+
+### Camera Handling
+```typescript
+// ✅ Proper camera setup with error handling
+const CameraScreen: React.FC = () => {
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const cameraRef = useRef<RNCamera>(null);
+  
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
+  
+  const startRecording = useCallback(async () => {
+    if (!cameraRef.current) return;
+    
+    try {
+      const options: RecordingOptions = {
+        quality: RNCamera.Constants.VideoQuality['720p'],
+        maxDuration: 30,
+        videoBitrate: 5 * 1000 * 1000, // 5 Mbps
+      };
+      
+      const { uri } = await cameraRef.current.recordAsync(options);
+      processVideo(uri);
+    } catch (error) {
+      handleRecordingError(error);
+    }
+  }, []);
+};
+```
+
+### Platform-Specific Code
+```typescript
+// ✅ Typed platform checks
+import { Platform, PlatformIOSStatic } from 'react-native';
+
+const styles = StyleSheet.create({
+  container: {
+    paddingTop: Platform.select({
+      ios: 50,
+      android: StatusBar.currentHeight ?? 30,
+    }),
+  },
+  shadow: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 4,
+    },
+  }),
+});
+
+// ✅ Platform-specific imports
+const HapticFeedback = Platform.select({
+  ios: () => require('./HapticFeedback.ios').default,
+  android: () => require('./HapticFeedback.android').default,
+})();
+```
+
+## Animation Patterns
+
+### React Native Reanimated 2
+```typescript
+// ✅ Proper worklet usage
+const animatedStyle = useAnimatedStyle(() => {
+  'worklet';
+  return {
+    opacity: withSpring(isVisible.value ? 1 : 0),
+    transform: [{
+      translateY: withTiming(isVisible.value ? 0 : 20),
+    }],
+  };
+});
+
+// ✅ Gesture handling
+const gesture = Gesture.Pan()
+  .onUpdate((event) => {
+    'worklet';
+    translateX.value = event.translationX;
+  })
+  .onEnd(() => {
+    'worklet';
+    translateX.value = withSpring(0);
+  });
+```
+
+## Style Management
+
+### StyleSheet Best Practices
+```typescript
+// ✅ ALWAYS: Use StyleSheet.create
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  button: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+});
+
+// ✅ Dynamic styles with useMemo
+const dynamicStyles = useMemo(() => ({
+  progressBar: {
+    width: `${progress}%`,
+    backgroundColor: progress > 80 ? colors.success : colors.primary,
+  },
+}), [progress]);
+
+// ❌ NEVER: Inline style objects
+// ❌ NEVER: String concatenation for styles
+```
+
+## Image and Video Handling
+
+```typescript
+// ✅ Optimized image loading
+import FastImage from 'react-native-fast-image';
+
+const TeamLogo: React.FC<{ uri: string }> = ({ uri }) => (
+  <FastImage
+    source={{
+      uri,
+      priority: FastImage.priority.normal,
+      cache: FastImage.cacheControl.immutable,
+    }}
+    resizeMode={FastImage.resizeMode.contain}
+    style={styles.logo}
+  />
+);
+
+// ✅ Video with proper cleanup
+const VideoPlayer: React.FC<{ uri: string }> = ({ uri }) => {
+  const videoRef = useRef<Video>(null);
+  
+  useEffect(() => {
+    return () => {
+      // Cleanup video resources
+      videoRef.current?.seek(0);
+      videoRef.current?.pause();
+    };
+  }, [uri]);
+  
+  return (
+    <Video
+      ref={videoRef}
+      source={{ uri }}
+      paused={false}
+      repeat={false}
+      resizeMode="contain"
+      onError={handleVideoError}
+    />
+  );
+};
+```
+
+## Navigation Patterns
+
+```typescript
+// ✅ Typed navigation
+export type RootStackParamList = {
+  Home: undefined;
+  Recording: undefined;
+  Analysis: { shotId: string };
+  Settings: { section?: 'profile' | 'preferences' };
+};
+
+export type AnalysisScreenProps = NativeStackScreenProps<
+  RootStackParamList, 
+  'Analysis'
+>;
+
+// ✅ Navigation with type safety
+const navigation = useNavigation<AnalysisScreenProps['navigation']>();
+navigation.navigate('Analysis', { shotId: 'shot_123' });
+```
+
+## Error Boundaries
+
+```typescript
+// ✅ ALWAYS: Wrap screens in error boundaries
+export class ScreenErrorBoundary extends Component<
+  { children: ReactNode; screenName: string },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    crashlytics().recordError(error, info.componentStack);
+    analytics.track('screen_crash', {
+      screen: this.props.screenName,
+      error: error.message,
+    });
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return <ErrorFallback onRetry={() => this.setState({ hasError: false })} />;
+    }
+    return this.props.children;
+  }
+}
+```
+
+## Testing Patterns
+
+```typescript
+// ✅ Component testing setup
+const renderWithProviders = (
+  ui: ReactElement,
+  options?: RenderOptions
+) => {
+  const AllProviders: React.FC<{ children: ReactNode }> = ({ children }) => (
+    <NavigationContainer>
+      <ConvexProvider client={mockConvexClient}>
+        {children}
+      </ConvexProvider>
+    </NavigationContainer>
+  );
+  
+  return render(ui, { wrapper: AllProviders, ...options });
+};
+
+// ✅ Test with proper mocking
+jest.mock('react-native-camera', () => ({
+  RNCamera: {
+    Constants: {
+      VideoQuality: { '720p': '720p' },
+    },
+  },
+}));
+```

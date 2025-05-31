@@ -1,0 +1,451 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: "Domain-specific rules for Smart Hockey Coach app"
+globs: ["**/*.ts", "**/*.tsx"]
+dependencies: ["@core/typescript-standards.mdc", "@framework/react-native-patterns.mdc", "@framework/convex-patterns.mdc"]
+priority: 80
+---
+
+# Smart Hockey Coach Domain Rules
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+│   ├── analysis/    # Shot analysis components
+│   ├── camera/      # Camera and recording
+│   ├── feedback/    # Feedback display
+│   └── common/      # Shared components
+├── screens/         # App screens
+├── hooks/          # Custom React hooks
+├── stores/         # Zustand stores
+├── lib/            # Utilities and helpers
+│   ├── ml/         # ML/TensorFlow utilities
+│   ├── video/      # Video processing
+│   └── gemini/     # Gemini API integration
+├── types/          # TypeScript type definitions
+└── constants/      # App constants
+
+convex/
+├── schema.ts       # Database schema
+├── shots/          # Shot-related functions
+├── users/          # User functions
+├── analysis/       # Gemini analysis
+└── streaming/      # Real-time updates
+```
+
+## Video Processing Standards
+
+### Video Constraints
+```typescript
+// ✅ ALWAYS: Enforce video limits
+export const VIDEO_CONSTRAINTS = {
+  MAX_DURATION: 30, // seconds
+  MAX_FILE_SIZE: {
+    FAST: 1_048_576,   // 1MB
+    FULL: 5_242_880,   // 5MB
+  },
+  RESOLUTION: {
+    WIDTH: 1280,
+    HEIGHT: 720,
+  },
+  FRAME_RATE: 30,
+  BITRATE: {
+    FAST: 3_000_000,   // 3 Mbps
+    FULL: 5_000_000,   // 5 Mbps
+  },
+} as const;
+
+// ✅ Video validation
+export function validateVideoFile(
+  file: VideoFile,
+  type: 'fast' | 'full'
+): Result<VideoFile, VideoError> {
+  if (file.duration > VIDEO_CONSTRAINTS.MAX_DURATION) {
+    return Err(new VideoError('Duration exceeds 30 seconds'));
+  }
+  
+  if (file.size > VIDEO_CONSTRAINTS.MAX_FILE_SIZE[type.toUpperCase()]) {
+    return Err(new VideoError(`File size exceeds ${type} limit`));
+  }
+  
+  return Ok(file);
+}
+```
+
+### Shot Detection
+```typescript
+// ✅ Shot detection types and thresholds
+export const SHOT_DETECTION = {
+  CONFIDENCE_THRESHOLD: 0.8,
+  MIN_DURATION: 0.5, // seconds
+  MAX_DURATION: 5.0, // seconds
+  FRAME_BUFFER: {
+    BEFORE_IMPACT: 1.0, // seconds
+    AFTER_IMPACT: 2.0,  // seconds
+  },
+} as const;
+
+export interface ShotDetection {
+  type: 'wrist' | 'slap' | 'snapshot' | 'backhand' | 'unknown';
+  confidence: number;
+  timestamps: {
+    start: number;
+    impact: number;
+    end: number;
+  };
+  boundingBox?: {
+    stick: BoundingBox;
+    puck: BoundingBox;
+  };
+}
+```
+
+## ML Model Integration
+
+### TensorFlow Lite Setup
+```typescript
+// ✅ Model loading with error handling
+export class ShotDetectionModel {
+  private model: TFLiteModel | null = null;
+  private isLoading = false;
+  
+  async initialize(): Promise<Result<void, ModelError>> {
+    if (this.model || this.isLoading) return Ok(undefined);
+    
+    this.isLoading = true;
+    try {
+      const modelAsset = await loadModelAsset('shot_detection_v1.tflite');
+      this.model = await TFLite.loadModel(modelAsset);
+      
+      // Warm up model
+      await this.model.predict(createDummyFrame());
+      
+      return Ok(undefined);
+    } catch (error) {
+      return Err(new ModelError('Failed to load ML model', { cause: error }));
+    } finally {
+      this.isLoading = false;
+    }
+  }
+  
+  async detectShot(frame: VideoFrame): Promise<Result<ShotDetection | null>> {
+    if (!this.model) {
+      return Err(new ModelError('Model not initialized'));
+    }
+    
+    try {
+      const input = preprocessFrame(frame);
+      const output = await this.model.predict(input);
+      const detection = parsePrediction(output);
+      
+      if (detection.confidence < SHOT_DETECTION.CONFIDENCE_THRESHOLD) {
+        return Ok(null);
+      }
+      
+      return Ok(detection);
+    } catch (error) {
+      return Err(new ModelError('Prediction failed', { cause: error }));
+    }
+  }
+}
+```
+
+## Gemini Integration
+
+### Prompt Templates
+```typescript
+// ✅ Type-safe prompt building
+export const PROMPT_TEMPLATES = {
+  SYSTEM: `System: You are Coach G, an expert ice hockey shooting coach...`,
+  
+  FAST_FEEDBACK: {
+    BASE: `Analyze this short hockey shot clip...`,
+    WITH_TYPE: `The player indicated this is a {shotType} shot...`,
+    RESPONSE_FORMAT: {
+      shot_outcome_fast: 'Goal|Miss|Save|Post|Blocked|Unknown',
+      shot_type_detected_fast: 'Wrist Shot|Slap Shot|Snapshot|Backhand|Unclear',
+    },
+  },
+  
+  FULL_FEEDBACK: {
+    TECHNICAL: `Provide detailed technical analysis...`,
+    MOTIVATIONAL: `Provide encouraging analysis...`,
+    PRO_ANALYST: `Analyze like a professional broadcast analyst...`,
+  },
+} as const;
+
+export function buildPrompt(
+  type: 'fast' | 'full',
+  options: PromptOptions
+): string {
+  // Type-safe prompt construction
+  const template = type === 'fast' 
+    ? PROMPT_TEMPLATES.FAST_FEEDBACK 
+    : PROMPT_TEMPLATES.FULL_FEEDBACK[options.style];
+    
+  return interpolateTemplate(template, options);
+}
+```
+
+### API Rate Limiting
+```typescript
+// ✅ Rate limiting for Gemini API
+export class GeminiRateLimiter {
+  private requestCounts = new Map<string, number>();
+  private readonly limits = {
+    DEVELOPER: { rpm: 60, rpd: 1500 },
+    VERTEX_AI: { rpm: 300, rpd: 10000 },
+  };
+  
+  async checkLimit(
+    apiType: 'DEVELOPER' | 'VERTEX_AI'
+  ): Promise<Result<void, RateLimitError>> {
+    const now = Date.now();
+    const minuteKey = `${apiType}:${Math.floor(now / 60000)}`;
+    const dayKey = `${apiType}:${Math.floor(now / 86400000)}`;
+    
+    const minuteCount = this.requestCounts.get(minuteKey) || 0;
+    const dayCount = this.requestCounts.get(dayKey) || 0;
+    
+    if (minuteCount >= this.limits[apiType].rpm) {
+      return Err(new RateLimitError('Minute limit exceeded'));
+    }
+    
+    if (dayCount >= this.limits[apiType].rpd) {
+      return Err(new RateLimitError('Daily limit exceeded'));
+    }
+    
+    this.requestCounts.set(minuteKey, minuteCount + 1);
+    this.requestCounts.set(dayKey, dayCount + 1);
+    
+    return Ok(undefined);
+  }
+}
+```
+
+## Feedback Processing
+
+### Progressive JSON Parsing
+```typescript
+// ✅ Safe progressive parsing for streaming responses
+export class FeedbackParser {
+  private buffer = '';
+  
+  appendChunk(chunk: string): ParsedFeedback {
+    this.buffer += chunk;
+    
+    const parsed: ParsedFeedback = {
+      complete: false,
+      sections: {},
+    };
+    
+    // Try to extract completed sections
+    const extractors: Array<[keyof FeedbackSections, RegExp]> = [
+      ['outcome', /"shot_outcome_full":\s*"([^"]+)"/],
+      ['trajectory', /"puck_trajectory_description":\s*"([^"]+)"/],
+      ['summary', /"overall_summary_and_encouragement":\s*"([^"]+)"/],
+    ];
+    
+    for (const [key, regex] of extractors) {
+      const match = this.buffer.match(regex);
+      if (match) {
+        parsed.sections[key] = match[1];
+      }
+    }
+    
+    // Check if JSON is complete
+    try {
+      const fullParsed = JSON.parse(this.buffer);
+      parsed.complete = true;
+      parsed.sections = fullParsed;
+    } catch {
+      // Still streaming
+    }
+    
+    return parsed;
+  }
+}
+```
+
+## Performance Monitoring
+
+### Latency Tracking
+```typescript
+// ✅ Track key performance metrics
+export class PerformanceMonitor {
+  private metrics: Map<string, number[]> = new Map();
+  
+  startTimer(operation: string): () => void {
+    const start = performance.now();
+    
+    return () => {
+      const duration = performance.now() - start;
+      this.recordMetric(operation, duration);
+    };
+  }
+  
+  recordMetric(operation: string, value: number): void {
+    const values = this.metrics.get(operation) || [];
+    values.push(value);
+    
+    // Keep only last 100 values
+    if (values.length > 100) {
+      values.shift();
+    }
+    
+    this.metrics.set(operation, values);
+    
+    // Log if exceeds threshold
+    const threshold = PERFORMANCE_THRESHOLDS[operation];
+    if (threshold && value > threshold) {
+      logger.warn(`Performance threshold exceeded`, {
+        operation,
+        value,
+        threshold,
+        p95: this.getP95(operation),
+      });
+    }
+  }
+  
+  getP95(operation: string): number {
+    const values = this.metrics.get(operation) || [];
+    if (values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.floor(sorted.length * 0.95);
+    return sorted[index];
+  }
+}
+
+export const PERFORMANCE_THRESHOLDS = {
+  'ml.shot_detection': 500,      // ms
+  'video.extraction': 1000,       // ms
+  'api.fast_feedback': 3000,      // ms
+  'api.full_feedback': 15000,     // ms
+  'ui.render_feedback': 100,      // ms
+} as const;
+```
+
+## Error Handling
+
+### Custom Error Types
+```typescript
+// ✅ Domain-specific error classes
+export class VideoProcessingError extends Error {
+  constructor(
+    message: string,
+    public readonly code: 'DURATION' | 'SIZE' | 'FORMAT' | 'EXTRACTION',
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = 'VideoProcessingError';
+  }
+}
+
+export class MLModelError extends Error {
+  constructor(
+    message: string,
+    public readonly code: 'LOAD' | 'PREDICT' | 'MEMORY',
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = 'MLModelError';
+  }
+}
+
+export class GeminiAPIError extends Error {
+  constructor(
+    message: string,
+    public readonly code: 'RATE_LIMIT' | 'CONTENT_FILTER' | 'TIMEOUT' | 'PARSE',
+    public readonly statusCode?: number,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = 'GeminiAPIError';
+  }
+}
+
+// ✅ Error recovery strategies
+export async function withRetry<T>(
+  operation: () => Promise<Result<T>>,
+  options: {
+    maxAttempts: number;
+    backoff: 'exponential' | 'linear';
+    initialDelay: number;
+  }
+): Promise<Result<T>> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < options.maxAttempts; attempt++) {
+    const result = await operation();
+    
+    if (result.success) {
+      return result;
+    }
+    
+    lastError = result.error;
+    
+    // Check if error is retryable
+    if (!isRetryableError(lastError)) {
+      return result;
+    }
+    
+    // Calculate delay
+    const delay = options.backoff === 'exponential'
+      ? options.initialDelay * Math.pow(2, attempt)
+      : options.initialDelay * (attempt + 1);
+      
+    await sleep(Math.min(delay, 30000)); // Cap at 30s
+  }
+  
+  return Err(lastError || new Error('Max retries exceeded'));
+}
+```
+
+## Testing Helpers
+
+```typescript
+// ✅ Test data factories
+export const TestFactories = {
+  createMockShot: (overrides?: Partial<Shot>): Shot => ({
+    _id: 'shot_test_123' as Id<'shots'>,
+    _creationTime: Date.now(),
+    userId: 'user_test_123' as Id<'users'>,
+    status: 'pending',
+    videoData: {
+      duration: 2.5,
+      recordedAt: Date.now(),
+    },
+    ...overrides,
+  }),
+  
+  createMockVideoFrame: (): VideoFrame => ({
+    timestamp: Date.now(),
+    width: 1280,
+    height: 720,
+    data: new Uint8Array(1280 * 720 * 3),
+  }),
+  
+  createMockFeedback: (type: 'fast' | 'full'): FeedbackData => {
+    if (type === 'fast') {
+      return {
+        shot_outcome_fast: 'Goal',
+        shot_type_detected_fast: 'Wrist Shot',
+      };
+    }
+    
+    return {
+      shot_outcome_full: 'Goal - Top Left Corner',
+      shot_type_confirmed: 'Wrist Shot',
+      key_positive_points: ['Great release', 'Good follow-through'],
+      // ... full structure
+    };
+  },
+};
+```
