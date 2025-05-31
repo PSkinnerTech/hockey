@@ -1,257 +1,306 @@
-# Smart Hockey Coach - Development Roadmap
+# Smart Hockey Coach - Development Roadmap (Updated January 2025)
 
-## Phase 0: Project Setup (Week 1)
+## Phase 0: Project Setup ✅ (Completed)
 
 ### Environment Setup
 - [x] Create GCP account and enable billing
 - [x] Create Convex account (start with free tier)
 - [x] Set up GitHub repository with branch protection
-- [x] Install development tools (Node.js, React Native CLI, Android Studio, Xcode)
+- [x] Install development tools (Node.js, Expo CLI, Android Studio, Xcode)
 - [x] Create Apple Developer and Google Play Console accounts
 
 ### Initial Configuration
-- [x] Initialize React Native project: `npx react-native init SmartHockeyCoach --template react-native-template-typescript`
+- [x] Initialize Expo project with TypeScript
 - [x] Set up Convex: `npx convex init`
 - [x] Configure ESLint, Prettier, and Husky for code quality
 - [x] Set up environment files (.env.development, .env.staging, .env.production)
-- [ ] Create basic CI/CD pipeline (GitHub Actions)
+- [x] Create basic CI/CD pipeline (GitHub Actions)
 
-## Phase 1: MVP Foundation (Weeks 2-3)
+## Phase 0.5: Expo MVP & Migration Decision ✅ (Completed)
 
-### Mobile App Base
-- [ ] Install core dependencies (React Navigation, Zustand, UI Kitten)
-- [ ] Create navigation structure (Home, Recording, Analysis screens)
-- [ ] Implement camera module with react-native-camera
-- [ ] Build basic video recording functionality (30s max)
-- [ ] Create simple video playback component
+### Expo MVP Development
+- [x] Install core dependencies (Expo Router, Zustand, React Native components)
+- [x] Create navigation structure (Home, Recording, Analysis screens)
+- [x] Implement basic camera adapter with expo-camera fallbacks
+- [x] Build mock video recording functionality
+- [x] Create compatibility layers for Expo Go limitations
+- [x] Set up storage adapters (AsyncStorage → MMKV)
+- [x] Implement mock ML/TensorFlow integration
 
-### Convex Backend Base
-- [ ] Define initial database schema (users, shots, feedbackResults)
-- [ ] Create HTTP endpoint for video upload (receiveShotData)
-- [ ] Implement basic authentication (Clerk or Convex Auth)
-- [ ] Set up file storage integration (Convex storage or GCS)
-- [ ] Deploy to Convex dev environment
+### Architecture Assessment
+- [x] Identify Expo limitations for hockey shot analysis
+- [x] Document VisionCamera requirements vs expo-camera capabilities
+- [x] Evaluate real-time video processing needs
+- [x] Research ML performance requirements (TensorFlow Lite vs web)
+- [x] Create migration plan to React Native
+- [x] Document technical debt and compatibility issues
 
-### Gemini Integration v1
-- [ ] Obtain Gemini Developer API key
-- [ ] Create Gemini client wrapper in Convex
-- [ ] Implement basic shot analysis action (analyzeShotBasic)
-- [ ] Test with simple prompt returning JSON
-- [ ] Display basic feedback in mobile app
-
-**Milestone: Basic video upload and AI analysis working end-to-end**
-
-## Phase 2: Real-time Feedback (Weeks 4-5)
-
-### On-Device ML
-- [ ] Research and select TFLite model for shot detection
-- [ ] Integrate react-native-tensorflow-lite
-- [ ] Implement frame-by-frame shot detection during recording
-- [ ] Add visual indicator when shot detected
-- [ ] Extract video segments based on detection
-
-### Fast Path Implementation
-- [ ] Create video segmentation logic (0.5-1.5s clips)
-- [ ] Implement dual upload paths (fast + full)
-- [ ] Create analyzeShotFastPath action with streaming
-- [ ] Design and implement fast feedback prompts
-- [ ] Build progressive UI for fast feedback display
-
-### Streaming Infrastructure
-- [ ] Implement Convex streaming updates
-- [ ] Create Zustand store for progressive state
-- [ ] Build React components with skeleton loaders
-- [ ] Add real-time subscriptions in mobile app
-- [ ] Test end-to-end streaming latency
-
-**Milestone: <3 second fast feedback working**
-
-## Phase 3: Full Analysis (Weeks 6-7)
-
-### Comprehensive Feedback
-- [ ] Create detailed analysis prompts (technical, motivational, pro styles)
-- [ ] Implement analyzeShotFullPath with all feedback sections
-- [ ] Build progressive parsing for complex JSON
-- [ ] Create UI components for each feedback section
-- [ ] Add drill recommendations and biomechanics display
-
-### Performance Optimization
-- [ ] Implement video compression (target sizes: fast <1MB, full <5MB)
-- [ ] Add network-aware quality selection
-- [ ] Optimize Convex function cold starts
-- [ ] Implement caching for common responses
-- [ ] Profile and optimize React Native rendering
-
-### User Experience
-- [ ] Add haptic feedback for shot detection
-- [ ] Implement smooth animations (React Native Reanimated)
-- [ ] Create error states and offline handling
-- [ ] Add video replay with analysis overlay
-- [ ] Build settings screen for coaching style selection
-
-**Milestone: Full analysis with <15s complete feedback**
-
-## Phase 4: Production Prep (Weeks 8-9)
-
-### Vertex AI Migration
-- [ ] Create GCP project for production
-- [ ] Deploy Gemini 2.5 Pro to Vertex AI endpoint
-- [ ] Configure provisioned throughput (min: 2 replicas)
-- [ ] Create service account with proper permissions
-- [ ] Update Convex to use Vertex AI in production
-
-### Testing Suite
-- [ ] Write unit tests for critical functions (>80% coverage)
-- [ ] Create integration tests for API endpoints
-- [ ] Implement E2E tests with Detox
-- [ ] Perform load testing on Vertex AI endpoint
-- [ ] Conduct security audit and penetration testing
-
-### Monitoring Setup
-- [ ] Configure Sentry for error tracking
-- [ ] Set up Google Cloud Monitoring dashboards
-- [ ] Implement custom performance metrics
-- [ ] Create alerting rules for critical issues
-- [ ] Build admin dashboard for system health
-
-**Milestone: Production-ready infrastructure with monitoring**
-
-## Phase 5: Beta Testing (Weeks 10-11)
-
-### Beta Release Preparation
-- [ ] Create beta testing plan and recruit 50-100 testers
-- [ ] Set up TestFlight (iOS) and Play Console beta track (Android)
-- [ ] Implement analytics tracking (Mixpanel/Amplitude)
-- [ ] Create in-app feedback mechanism
-- [ ] Prepare beta onboarding materials
-
-### Beta Deployment
-- [ ] Deploy Convex to production environment
-- [ ] Configure production environment variables
-- [ ] Build and submit beta apps to stores
-- [ ] Monitor initial user sessions closely
-- [ ] Create feedback collection spreadsheet
-
-### Beta Iterations
-- [ ] Fix critical bugs within 24 hours
-- [ ] Implement top 3 user-requested features
-- [ ] Optimize based on performance data
-- [ ] A/B test coaching styles and UI elements
-- [ ] Prepare production launch plan
-
-**Milestone: Stable beta with positive user feedback**
-
-## Phase 6: Production Launch (Week 12)
-
-### Final Preparations
-- [ ] Conduct final security review
-- [ ] Optimize Vertex AI autoscaling settings
-- [ ] Prepare App Store and Play Store listings
-- [ ] Create demo video and screenshots
-- [ ] Write press release and launch materials
-
-### Production Deployment
-- [ ] Deploy final Convex functions
-- [ ] Submit apps for App Store review
-- [ ] Configure production monitoring alerts
-- [ ] Brief support team on common issues
-- [ ] Set up automated backup procedures
-
-### Launch Day
-- [ ] Monitor all systems closely
-- [ ] Respond to user reviews quickly
-- [ ] Track key metrics (installs, retention, feedback latency)
-- [ ] Address any critical issues immediately
-- [ ] Celebrate with the team! 🎉
-
-**Milestone: App live in both stores with stable performance**
-
-## Post-Launch (Ongoing)
-
-### Week 13-14: Stabilization
-- [ ] Fix any launch issues
-- [ ] Optimize based on real usage patterns
-- [ ] Improve low-rated features
-- [ ] Plan v1.1 features based on feedback
-
-### Month 2-3: Growth
-- [ ] Implement user-requested features
-- [ ] Add social sharing capabilities
-- [ ] Create coaching progression system
-- [ ] Explore team/coach accounts
-- [ ] Consider subscription model
-
-### Future Enhancements
-- [ ] Multi-angle video analysis
-- [ ] Slow-motion replay integration
-- [ ] Historical progress tracking
-- [ ] Competitive benchmarking
-- [ ] Integration with smart pucks/sensors
-
-## Key Success Metrics
-
-### Technical Metrics
-- Fast feedback latency: <3 seconds (p95)
-- Full analysis completion: <15 seconds (p95)
-- App crash rate: <0.5%
-- API success rate: >99.5%
-
-### User Metrics
-- Day 1 retention: >60%
-- Day 7 retention: >30%
-- Average session length: >5 minutes
-- User satisfaction: >4.5 stars
-
-### Business Metrics
-- Beta conversion rate: >40%
-- Monthly active users: Growth >20% MoM
-- Feature adoption: >70% use detailed analysis
-- Support tickets: <5% of DAU
-
-## Risk Mitigation
-
-### Technical Risks
-- **Gemini API changes**: Maintain abstraction layer
-- **Vertex AI costs**: Monitor usage, implement caps
-- **App Store rejection**: Follow guidelines strictly
-- **Performance issues**: Extensive testing, gradual rollout
-
-### Business Risks
-- **Low user adoption**: Strong beta program, iterate quickly
-- **Competitive threats**: Focus on unique AI capabilities
-- **Scaling challenges**: Plan infrastructure early
-- **Support overwhelm**: Build comprehensive FAQ/docs
-
-## Resource Requirements
-
-### Team (Minimum)
-- 1 Full-stack developer (React Native + backend)
-- 1 ML/AI engineer (part-time after Phase 1)
-- 1 UI/UX designer (part-time)
-- 1 QA tester (full-time from Phase 4)
-- 1 Product manager (coordinating)
-
-### Budget Estimates
-- Development tools/services: $500/month
-- GCP/Vertex AI (production): $2,000-5,000/month
-- Convex (production): $250/month
-- App store fees: $125/year
-- Testing devices: $3,000 one-time
-
-## Critical Path Dependencies
-
-```
-Phase 0 → Phase 1 → Phase 2 → Phase 3
-                      ↓
-                   Phase 4 → Phase 5 → Phase 6
-```
-
-**Blocking dependencies:**
-- Vertex AI setup blocks production deployment
-- On-device ML blocks fast feedback
-- Beta feedback blocks production features
-- App store approval blocks launch
+**Key Finding: Expo cannot deliver core value proposition (real-time shot analysis)**
 
 ---
 
-Remember: This roadmap is a guide. Adjust timelines based on your team's velocity and user feedback. The key is maintaining momentum while ensuring quality at each milestone.
+## 🚨 STRATEGIC PIVOT: EXPO → REACT NATIVE MIGRATION
+
+**Decision Date:** January 2025  
+**Rationale:** Advanced camera capabilities and real-time ML processing required for hockey coaching  
+**Migration Plan:** See `docs/EXPO-TO-RN-MIGRATION.md`
+
+---
+
+## Phase 1: React Native Migration ✅ (COMPLETED - January 2025)
+
+### ✅ Foundation Migration (Completed)
+- [x] Initialize new React Native project with TypeScript
+- [x] Configure React Native 0.79.2 with New Architecture (Fabric + TurboModules)
+- [x] Enable Hermes JavaScript engine for optimal performance
+- [x] Set up iOS build pipeline with CocoaPods
+- [x] Fix Xcode workspace configuration (.xcworkspace vs .xcodeproj)
+- [x] Create Cursor rules to prevent common React Native mistakes
+
+### ✅ Dependencies & Infrastructure (Completed)
+- [x] Install and configure react-native-vision-camera (4.6.4)
+- [x] Enable Frame Processors with react-native-worklets-core
+- [x] Install React Navigation (@react-navigation/native, @react-navigation/stack)
+- [x] Set up high-performance storage (react-native-mmkv)
+- [x] Configure AsyncStorage for compatibility
+- [x] Add safe area handling (react-native-safe-area-context)
+- [x] Install react-native-screens for navigation optimization
+
+### ✅ Platform Configuration (Completed)
+- [x] Configure iOS permissions (camera, microphone)
+- [x] Set up Babel config with worklets plugin
+- [x] Configure Metro bundler for Frame Processors
+- [x] Test iOS Simulator build pipeline
+- [x] Verify VisionCamera integration and Frame Processors enabled
+
+**✅ MIGRATION MILESTONE ACHIEVED: Professional React Native foundation with VisionCamera and real-time processing capabilities**
+
+---
+
+## Phase 2: Core Camera Implementation (Current Phase - Week 1)
+
+### 🔄 Week 1: Basic Camera Functionality
+- [ ] **Camera Screen Development**
+  - [ ] Create VisionCamera component with device detection
+  - [ ] Implement camera permissions flow
+  - [ ] Build camera preview UI with hockey-focused controls
+  - [ ] Add camera flip (front/back) functionality
+  - [ ] Test camera on iOS Simulator and device
+
+- [ ] **Video Recording**
+  - [ ] Implement 60fps video recording (1080p)
+  - [ ] Add recording start/stop controls with haptic feedback
+  - [ ] Create recording indicator UI
+  - [ ] Implement video file management (save to documents)
+  - [ ] Test video quality and performance
+
+- [ ] **Basic Navigation**
+  - [ ] Replace default React Native screen with hockey app structure
+  - [ ] Create main navigation (Home → Camera → Playback)
+  - [ ] Implement basic screen transitions
+  - [ ] Add loading states and error handling
+
+**Week 1 Goal: Working camera app that can record 60fps hockey footage**
+
+### 🔄 Week 2: Video Playback & Storage
+- [ ] **Video Playback Component**
+  - [ ] Create video player with controls (play/pause/scrub)
+  - [ ] Implement slow-motion playback for technique analysis
+  - [ ] Add frame-by-frame navigation
+  - [ ] Design hockey-focused playback UI
+
+- [ ] **Storage Management**
+  - [ ] Implement video file organization (by date/session)
+  - [ ] Add video metadata storage (date, duration, quality)
+  - [ ] Create video library browsing
+  - [ ] Implement delete/share functionality
+
+- [ ] **Performance Optimization**
+  - [ ] Optimize video compression for storage
+  - [ ] Implement background video processing
+  - [ ] Add memory management for large video files
+  - [ ] Test with multiple hockey shot recordings
+
+**Week 2 Goal: Complete camera + playback workflow for hockey analysis**
+
+## Phase 3: Frame Processing & Shot Detection (Week 3-4)
+
+### 🔄 Week 3: Basic Frame Processing
+- [ ] **Frame Processor Setup**
+  - [ ] Create basic frame processor for VisionCamera
+  - [ ] Implement frame extraction during recording
+  - [ ] Add frame rate optimization (analyze every Nth frame)
+  - [ ] Test frame processing performance impact
+
+- [ ] **Motion Detection**
+  - [ ] Implement basic motion detection in frames
+  - [ ] Create hockey stick movement detection algorithms
+  - [ ] Add shot timing detection (windup → release)
+  - [ ] Build visual indicators for detected motion
+
+- [ ] **Video Segmentation**
+  - [ ] Automatically detect shot moments in recording
+  - [ ] Extract 2-3 second clips around detected shots
+  - [ ] Create shot timeline visualization
+  - [ ] Implement manual shot marking as backup
+
+**Week 3 Goal: Real-time shot detection during recording**
+
+### 🔄 Week 4: Advanced Analysis Preparation
+- [ ] **TensorFlow Lite Integration**
+  - [ ] Install react-native-fast-tflite
+  - [ ] Create basic model runner for frame analysis
+  - [ ] Test TFLite performance on hockey footage
+  - [ ] Prepare for custom hockey model integration
+
+- [ ] **Hockey-Specific Detection**
+  - [ ] Research hockey shot recognition models
+  - [ ] Implement puck tracking in frames
+  - [ ] Add stick position analysis
+  - [ ] Create hockey stance detection
+
+- [ ] **Analysis Data Structure**
+  - [ ] Design shot analysis data schema
+  - [ ] Create local storage for analysis results
+  - [ ] Build analysis result UI components
+  - [ ] Prepare for backend integration
+
+**Week 4 Goal: Foundation for AI-powered hockey analysis**
+
+## Phase 4: Backend Integration & AI Analysis (Week 5-6)
+
+### 🔄 Week 5: Convex Backend Setup
+- [ ] **Backend Infrastructure**
+  - [ ] Update Convex schema for hockey video analysis
+  - [ ] Create video upload endpoints
+  - [ ] Implement user authentication system
+  - [ ] Set up file storage for video clips
+
+- [ ] **Gemini Integration v1**
+  - [ ] Obtain Gemini Developer API key
+  - [ ] Create hockey analysis prompts
+  - [ ] Build basic shot analysis action
+  - [ ] Test with real hockey footage
+
+**Week 5 Goal: End-to-end video upload and basic AI analysis**
+
+### 🔄 Week 6: Real-time AI Feedback
+- [ ] **Fast Analysis Pipeline**
+  - [ ] Implement quick shot analysis for 2-3s clips
+  - [ ] Create streaming analysis updates
+  - [ ] Build progressive feedback UI
+  - [ ] Target <5 second analysis time
+
+- [ ] **Hockey Coaching Intelligence**
+  - [ ] Develop hockey-specific analysis prompts
+  - [ ] Implement technique scoring system
+  - [ ] Add drill recommendations
+  - [ ] Create improvement suggestions
+
+**Week 6 Goal: Real-time hockey coaching feedback**
+
+## Phase 5: Professional UX & Polish (Week 7-8)
+
+### 🔄 Week 7: Hockey Coach UX
+- [ ] **Professional Interface**
+  - [ ] Design hockey-focused UI theme
+  - [ ] Add smooth animations (Reanimated)
+  - [ ] Implement haptic feedback for shots
+  - [ ] Create coaching progression system
+
+- [ ] **Analysis Visualization**
+  - [ ] Build shot technique breakdown UI
+  - [ ] Add video overlay with analysis markers
+  - [ ] Create progress tracking dashboard
+  - [ ] Implement skill level assessments
+
+### 🔄 Week 8: Performance & Testing
+- [ ] **Optimization**
+  - [ ] Optimize video processing pipeline
+  - [ ] Improve battery life during recording
+  - [ ] Enhance frame processing performance
+  - [ ] Memory leak prevention and cleanup
+
+- [ ] **Quality Assurance**
+  - [ ] Test with diverse hockey players
+  - [ ] Validate analysis accuracy
+  - [ ] Performance testing on older devices
+  - [ ] User experience testing
+
+**Phase 5 Goal: Professional hockey coaching app ready for beta**
+
+## Phase 6: Beta Testing (Week 9-10)
+
+### 🔄 Week 9: Beta Preparation
+- [ ] Recruit 50-100 hockey players for testing
+- [ ] Set up TestFlight and Play Console beta
+- [ ] Create onboarding for hockey players
+- [ ] Implement analytics and feedback collection
+
+### 🔄 Week 10: Beta Iterations
+- [ ] Fix critical bugs from hockey community
+- [ ] Optimize analysis based on real footage
+- [ ] Implement top user-requested features
+- [ ] Prepare production launch plan
+
+**Phase 6 Goal: Validated product with positive hockey community feedback**
+
+## Phase 7: Production Launch (Week 11)
+
+### Production Deployment
+- [ ] Deploy to App Store and Google Play
+- [ ] Launch marketing to hockey community
+- [ ] Monitor system performance
+- [ ] Support hockey users
+
+**Phase 7 Goal: Smart Hockey Coach live with growing user base**
+
+---
+
+## Current Status (January 2025)
+
+### ✅ What's Complete
+- **React Native Foundation**: Professional setup with New Architecture
+- **VisionCamera Integration**: 60fps recording capability with Frame Processors
+- **Build Pipeline**: iOS builds working, proper workspace configuration
+- **Development Workflow**: Cursor rules prevent common mistakes
+- **Core Dependencies**: Navigation, storage, camera all installed and configured
+
+### 🎯 What's Next (This Week)
+1. **Create camera recording screen** with VisionCamera
+2. **Implement basic video recording** (60fps, 1080p)  
+3. **Build video playback functionality**
+4. **Test with actual hockey shots**
+
+### 📊 Updated Timeline
+- **Phase 2-3**: Camera + Frame Processing (Weeks 1-4)
+- **Phase 4**: Backend + AI Integration (Weeks 5-6)  
+- **Phase 5**: UX Polish (Weeks 7-8)
+- **Phase 6**: Beta Testing (Weeks 9-10)
+- **Phase 7**: Production Launch (Week 11)
+
+**Total Timeline: 11 weeks from now to production launch**
+
+### 🏒 Success Metrics (Updated)
+- **Technical**: 60fps recording, <3s shot detection, <5s AI analysis
+- **User**: >4.5 stars, >30% D7 retention, >80% complete analysis
+- **Hockey**: >95% shot detection accuracy, meaningful coaching feedback
+
+### 💰 Cost Estimates (Monthly)
+- **Development**: Sunk cost (team time)
+- **GCP/Vertex AI**: $2,000-5,000 (production)
+- **Convex**: $250
+- **App Stores**: $25
+- **Total**: ~$2,500-5,500/month at scale
+
+---
+
+**Next Action Items:**
+1. Create VisionCamera recording screen
+2. Implement video file management  
+3. Build playback functionality
+4. Test with hockey footage
+
+*Roadmap Version: 3.0 (Current Status)*  
+*Last Updated: January 2025*  
+*Status: Phase 1 Complete ✅, Phase 2 In Progress 🔄*

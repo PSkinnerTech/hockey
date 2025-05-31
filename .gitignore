@@ -1,0 +1,8 @@
+# private docs
+/docs
+
+# Cursor Rules
+.cursor
+
+# Claude Rules
+.claude

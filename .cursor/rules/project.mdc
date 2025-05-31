@@ -24,9 +24,11 @@ This directory contains MDC (Markdown Domain Configuration) rules that guide AI 
 │   │   └── prevent-antipatterns.mdc    # Anti-pattern prevention
 │   ├── domain/
 │   │   └── smart-hockey-coach.mdc      # Project-specific rules
-│   └── infrastructure/
-│       └── structured-logging.mdc       # Logging patterns
-└── README.md                     # This file
+│   ├── infra/
+│   │   ├── structured-logging.mdc       # Logging patterns
+│   │   ├── xcode.mdc                    # Xcode workspace rules
+│   │   └── pod-install.mdc              # CocoaPods deprecation rules
+│   └── README.md                     # This file
 ```
 
 ## How Rules Work
@@ -137,7 +139,7 @@ When adding new rules:
 
 ## Resources
 
-- [Cursor Rules Documentation](https://docs.cursor.com/context/rules)
-- [TypeScript Best Practices](https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html)
-- [React Native Performance](https://reactnative.dev/docs/performance)
-- [Convex Best Practices](https://docs.convex.dev/production/best-practices)
+- [Cursor Rules Documentation](mdc:https:/docs.cursor.com/context/rules)
+- [TypeScript Best Practices](mdc:https:/www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html)
+- [React Native Performance](mdc:https:/reactnative.dev/docs/performance)
+- [Convex Best Practices](mdc:https:/docs.convex.dev/production/best-practices)
