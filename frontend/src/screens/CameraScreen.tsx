@@ -21,6 +21,7 @@ import {
 } from 'react-native-vision-camera';
 import { request, check, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { RootStackParamList } from '../types/navigation';
+import { videoStorageService } from '../services/VideoStorageService';
 
 type CameraScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Camera'>;
 
@@ -36,6 +37,8 @@ export default function CameraScreen() {
   const [isReady, setIsReady] = useState(false);
   const [device, setDevice] = useState<CameraDevice | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [recordingCount, setRecordingCount] = useState(0);
 
   // Check initial microphone permission status
   useEffect(() => {
@@ -45,6 +48,7 @@ export default function CameraScreen() {
           const result = await check(PERMISSIONS.IOS.MICROPHONE);
           console.log('Initial microphone permission status:', result);
           
+          // Enable audio by default if permission is granted
           if (result === RESULTS.GRANTED) {
             setAudioEnabled(true);
           } else {
@@ -54,6 +58,9 @@ export default function CameraScreen() {
           console.error('Error checking microphone permission:', error);
           setAudioEnabled(false);
         }
+      } else {
+        // For Android, enable audio by default (can add Android permission handling later)
+        setAudioEnabled(true);
       }
     };
     
@@ -124,8 +131,38 @@ export default function CameraScreen() {
     }
   }, [hasPermission, requestPermission]);
 
+  // Reset camera and audio session for clean recording
+  const resetCameraSession = async () => {
+    if (isResetting) return;
+    
+    setIsResetting(true);
+    console.log('Resetting camera session...');
+    
+    try {
+      // Disable audio to prevent session conflicts
+      setAudioEnabled(false);
+      
+      // Longer pause to allow complete audio session cleanup
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Reset ready state to force re-initialization
+      setIsReady(false);
+      
+      // Longer delay to allow camera to properly reinitialize
+      setTimeout(() => {
+        setIsReady(true);
+        setIsResetting(false);
+        console.log('Camera session reset complete');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error resetting camera session:', error);
+      setIsResetting(false);
+    }
+  };
+
   const handleStartRecording = async () => {
-    if (!device) return;
+    if (!device || isResetting) return;
 
     // Handle simulator recording
     if (device.id === 'simulator-camera') {
@@ -136,6 +173,7 @@ export default function CameraScreen() {
       setTimeout(() => {
         console.log('Simulating recording finish...');
         setIsRecording(false);
+        setRecordingCount(prev => prev + 1);
         Alert.alert(
           'Simulator Recording', 
           'This was a simulated recording. Use a physical device for actual video recording.',
@@ -145,33 +183,86 @@ export default function CameraScreen() {
       return;
     }
 
-    if (!camera.current) return;
+    if (!camera.current || !isReady) return;
 
     try {
       setIsRecording(true);
+      setRecordingCount(prev => prev + 1);
       
       console.log('Starting recording with audio:', audioEnabled);
       
       camera.current.startRecording({
         flash: 'off',
         fileType: 'mp4',
-        onRecordingFinished: (video: VideoFile) => {
+        onRecordingFinished: async (video: VideoFile) => {
           console.log('Recording finished:', video.path);
           setIsRecording(false);
-          // Navigate to playback with the recorded video
-          navigation.navigate('Playback', { videoUri: video.path });
+          
+          try {
+            // Save video to storage with metadata
+            const savedVideo = await videoStorageService.saveVideo(
+              video.path,
+              video.duration || 3.0, // Default duration if not provided
+              audioEnabled
+            );
+            
+            console.log('Video saved to storage:', savedVideo.id);
+            
+            // Navigate to video library to show the new video
+            setTimeout(() => {
+              navigation.navigate('VideoLibrary');
+            }, 1000);
+            
+            // Show success message
+            Alert.alert(
+              'Shot Recorded! 🏒',
+              `Your hockey shot has been saved to the library. Duration: ${videoStorageService.formatDuration(savedVideo.duration)}`,
+              [
+                { text: 'View Library', onPress: () => navigation.navigate('VideoLibrary') },
+                { text: 'Record Another', onPress: () => {} },
+              ]
+            );
+            
+          } catch (error) {
+            console.error('Failed to save video:', error);
+            
+            // Fallback to old behavior if saving fails
+            setTimeout(() => {
+              navigation.navigate('Playback', { videoUri: video.path });
+            }, 1000);
+            
+            Alert.alert(
+              'Recording Saved',
+              'Your shot was recorded but there was an issue organizing it. You can still view it now.',
+              [{ text: 'View Shot', onPress: () => navigation.navigate('Playback', { videoUri: video.path }) }]
+            );
+          }
         },
         onRecordingError: (error) => {
           console.error('Recording error:', error);
-          
           setIsRecording(false);
-          Alert.alert('Recording Error', 'Failed to record video');
+          
+          // Reset camera session on error
+          setTimeout(() => {
+            resetCameraSession();
+          }, 500);
+          
+          Alert.alert(
+            'Recording Error',
+            'There was an issue with recording. Please try again.',
+            [{ text: 'OK' }]
+          );
         },
       });
     } catch (error) {
       console.error('Failed to start recording:', error);
       setIsRecording(false);
-      Alert.alert('Error', 'Failed to start recording');
+      
+      Alert.alert(
+        'Error',
+        'Failed to start recording. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -198,47 +289,66 @@ export default function CameraScreen() {
     navigation.goBack();
   };
 
-  const handleAudioToggle = () => {
+  const handleAudioToggle = async () => {
     if (audioEnabled) {
       // Simply disable audio
       setAudioEnabled(false);
     } else {
-      // Use react-native-permissions to request microphone permission
-      if (Platform.OS === 'ios') {
-        request(PERMISSIONS.IOS.MICROPHONE).then((result) => {
-          console.log("permission is--------", result);
+      await requestAudioPermissionAndEnable();
+    }
+  };
+
+  const requestAudioPermissionAndEnable = async () => {
+    if (Platform.OS === 'ios') {
+      try {
+        const result = await request(PERMISSIONS.IOS.MICROPHONE);
+        console.log("Microphone permission result:", result);
+        
+        if (result === RESULTS.GRANTED) {
+          console.log('Microphone permission granted');
           
-          if (result === RESULTS.GRANTED) {
-            console.log('Microphone permission granted');
-            setAudioEnabled(true);
-          } else if (result === RESULTS.DENIED) {
-            console.log('Microphone permission denied');
-            Alert.alert(
-              'Microphone Permission',
-              'Microphone access was denied. Recording will continue without audio.',
-              [{ text: 'OK' }]
-            );
-            setAudioEnabled(false);
-          } else if (result === RESULTS.BLOCKED) {
-            console.log('Microphone permission blocked');
-            Alert.alert(
-              'Microphone Access Blocked',
-              'Microphone access is blocked. To enable audio recording, please go to Settings → Privacy & Security → Microphone → Smart Hockey Coach and enable access.',
-              [{ text: 'OK' }]
-            );
-            setAudioEnabled(false);
-          } else {
-            console.log('Microphone permission unavailable');
-            setAudioEnabled(false);
-          }
-        }).catch((error) => {
-          console.error('Error requesting microphone permission:', error);
+          Alert.alert(
+            'Enable Audio Recording',
+            'Audio recording will be enabled for the next recording session. The camera will be reset to apply changes.',
+            [
+              {
+                text: 'Enable Audio',
+                onPress: async () => {
+                  setAudioEnabled(true);
+                  // Reset camera session to apply audio changes
+                  await resetCameraSession();
+                }
+              }
+            ]
+          );
+          
+        } else if (result === RESULTS.DENIED) {
+          console.log('Microphone permission denied');
+          Alert.alert(
+            'Microphone Permission',
+            'Microphone access was denied. Recording will continue without audio.',
+            [{ text: 'OK' }]
+          );
           setAudioEnabled(false);
-        });
-      } else {
-        // For Android, enable audio directly (can add Android permission handling later)
-        setAudioEnabled(true);
+        } else if (result === RESULTS.BLOCKED) {
+          console.log('Microphone permission blocked');
+          Alert.alert(
+            'Microphone Access Blocked',
+            'Microphone access is blocked. To enable audio recording, please go to Settings → Privacy & Security → Microphone → Smart Hockey Coach and enable access.',
+            [{ text: 'OK' }]
+          );
+          setAudioEnabled(false);
+        } else {
+          console.log('Microphone permission unavailable');
+          setAudioEnabled(false);
+        }
+      } catch (error) {
+        console.error('Error requesting microphone permission:', error);
+        setAudioEnabled(false);
       }
+    } else {
+      // For Android, enable audio directly (can add Android permission handling later)
+      setAudioEnabled(true);
     }
   };
 
@@ -322,7 +432,10 @@ export default function CameraScreen() {
             isActive={true}
             video={true}
             audio={audioEnabled}
-            onInitialized={() => setIsReady(true)}
+            onInitialized={() => {
+              console.log('Camera initialized successfully');
+              setIsReady(true);
+            }}
             onError={(error) => {
               console.log('Camera error:', error);
               
@@ -336,6 +449,17 @@ export default function CameraScreen() {
                   'Microphone access was denied. Recording will continue without audio. To enable audio recording, please allow microphone access in Settings > Privacy & Security > Microphone > Smart Hockey Coach.',
                   [{ text: 'OK' }]
                 );
+                return;
+              }
+              
+              // Handle other camera errors
+              console.error('Camera error:', error.code, error.message);
+              
+              // Try to reset the camera session for any other errors
+              if (!isResetting) {
+                setTimeout(() => {
+                  resetCameraSession();
+                }, 2000);
               }
             }}
           />
@@ -392,19 +516,26 @@ export default function CameraScreen() {
             <Text style={styles.audioStatusText}>
               Audio Recording: {audioEnabled ? '✅ Enabled' : '❌ Disabled'}
             </Text>
-            {!audioEnabled && (
-              <Text style={styles.audioHelpText}>
-                📱 Tap "Enable Audio Recording" below. iOS may prompt for microphone permission.
-              </Text>
-            )}
+            <Text style={styles.audioHelpText}>
+              {audioEnabled
+                ? '🎤 Audio will record with your next video'
+                : '📱 Tap "Enable Audio Recording" below to add sound to your videos'
+              }
+            </Text>
           </View>
           
           <TouchableOpacity
-            style={[styles.audioButton, !audioEnabled && styles.audioButtonDisabled]}
+            style={[
+              styles.audioButton, 
+              !audioEnabled && styles.audioButtonDisabled
+            ]}
             onPress={handleAudioToggle}
           >
             <Text style={styles.audioButtonText}>
-              {audioEnabled ? '🎤 Disable Audio Recording' : '🎤 Enable Audio Recording'}
+              {audioEnabled 
+                ? '🎤 Disable Audio Recording' 
+                : '🎤 Enable Audio Recording'
+              }
             </Text>
           </TouchableOpacity>
         </View>
@@ -413,16 +544,18 @@ export default function CameraScreen() {
       {/* Instructions */}
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          {isReady 
+          {isResetting
+            ? 'Resetting camera session...'
+            : isReady 
             ? isRecording 
               ? `Recording your shot${audioEnabled ? ' with audio' : ' (video only)'}...` 
               : 'Tap the red button to start recording'
             : 'Setting up camera...'
           }
         </Text>
-        {!audioEnabled && device?.id !== 'simulator-camera' && (
-          <Text style={styles.settingsHint}>
-            💡 If microphone access was denied, enable it in Settings {'->'} Privacy & Security {'->'} Microphone {'->'} Smart Hockey Coach
+        {isResetting && (
+          <Text style={styles.resetHint}>
+            🔄 Camera is being reset to ensure clean recording session
           </Text>
         )}
       </View>
@@ -669,7 +802,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  settingsHint: {
+  resetHint: {
     color: '#888888',
     fontSize: 12,
     marginTop: 4,

@@ -21,7 +21,7 @@ export default function HomeScreen() {
   };
 
   const handleViewRecordingsPress = () => {
-    navigation.navigate('Playback', {});
+    navigation.navigate('VideoLibrary');
   };
 
   return (
@@ -45,7 +45,7 @@ export default function HomeScreen() {
           style={styles.secondaryButton}
           onPress={handleViewRecordingsPress}
         >
-          <Text style={styles.secondaryButtonText}>📁 View Recordings</Text>
+          <Text style={styles.secondaryButtonText}>📚 Shot Library</Text>
         </TouchableOpacity>
       </View>
 

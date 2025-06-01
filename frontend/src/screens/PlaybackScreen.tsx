@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,14 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
+import HockeyVideoPlayer from '../components/HockeyVideoPlayer';
+import { VideoMetadata, videoStorageService } from '../services/VideoStorageService';
+import { showShareActionSheet } from '../utils/shareUtils';
 
 type PlaybackScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Playback'>;
 type PlaybackScreenRouteProp = RouteProp<RootStackParamList, 'Playback'>;
@@ -19,6 +23,30 @@ export default function PlaybackScreen() {
   const route = useRoute<PlaybackScreenRouteProp>();
   
   const { videoUri } = route.params || {};
+  const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+
+  // Load video metadata when component mounts
+  useEffect(() => {
+    if (videoUri) {
+      loadVideoMetadata();
+    }
+  }, [videoUri]);
+
+  const loadVideoMetadata = async () => {
+    if (!videoUri) return;
+    
+    try {
+      setIsLoadingMetadata(true);
+      const metadata = await videoStorageService.getVideoByPath(videoUri);
+      setVideoMetadata(metadata);
+    } catch (error) {
+      console.error('Failed to load video metadata:', error);
+      // Continue without metadata - sharing will still work with basic info
+    } finally {
+      setIsLoadingMetadata(false);
+    }
+  };
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -28,40 +56,73 @@ export default function PlaybackScreen() {
     navigation.navigate('Camera');
   };
 
+  const handleVideoError = (error: any) => {
+    console.error('Video playback error:', error);
+    Alert.alert(
+      'Video Error', 
+      'Unable to play this video. The file might be corrupted or in an unsupported format.',
+      [
+        { text: 'Try Again', onPress: () => {} },
+        { text: 'Record New', onPress: handleRecordNew },
+      ]
+    );
+  };
+
+  const handleVideoLoad = (data: any) => {
+    console.log('Video loaded successfully:', data);
+  };
+
+  const handleShare = () => {
+    if (videoMetadata) {
+      showShareActionSheet(videoMetadata, (success) => {
+        if (success) {
+          console.log('Video shared successfully');
+        }
+      });
+    } else {
+      Alert.alert(
+        'Share Video',
+        'Video metadata is still loading. Please try again in a moment.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Shot Playback</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.title}>Shot Analysis</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('VideoLibrary')}>
+          <Text style={styles.headerAction}>Shot Library</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
         {videoUri ? (
           <View style={styles.videoContainer}>
-            <View style={styles.videoPlaceholder}>
-              <Text style={styles.videoPlaceholderText}>📹</Text>
-              <Text style={styles.videoPath}>Video recorded:</Text>
-              <Text style={styles.videoPathText} numberOfLines={3}>
-                {videoUri}
-              </Text>
+            <View style={styles.playerContainer}>
+              <HockeyVideoPlayer
+                videoUri={videoUri}
+                onError={handleVideoError}
+                onLoad={handleVideoLoad}
+              />
             </View>
             
-            <View style={styles.analysisContainer}>
-              <Text style={styles.analysisTitle}>🏒 Shot Analysis</Text>
-              <Text style={styles.analysisText}>
-                Video recorded successfully! In the next phase, we'll add:
+            <View style={styles.infoPanel}>
+              <Text style={styles.infoPanelTitle}>🏒 Shot Recording</Text>
+              <Text style={styles.infoText}>
+                Use the video controls below to analyze your hockey shot:
               </Text>
               <View style={styles.featureList}>
-                <Text style={styles.featureItem}>• Real-time shot detection</Text>
-                <Text style={styles.featureItem}>• AI-powered technique analysis</Text>
-                <Text style={styles.featureItem}>• Slow-motion playback</Text>
-                <Text style={styles.featureItem}>• Frame-by-frame breakdown</Text>
-                <Text style={styles.featureItem}>• Coaching recommendations</Text>
+                <Text style={styles.featureItem}>• Use 0.25x speed for detailed technique analysis</Text>
+                <Text style={styles.featureItem}>• Frame-by-frame navigation with ⏮️ ⏭️ buttons</Text>
+                <Text style={styles.featureItem}>• Drag the seek bar for precise positioning</Text>
+                <Text style={styles.featureItem}>• Tap the video to show/hide controls</Text>
               </View>
             </View>
           </View>
@@ -70,26 +131,35 @@ export default function PlaybackScreen() {
             <Text style={styles.emptyIcon}>📁</Text>
             <Text style={styles.emptyTitle}>No Recordings Yet</Text>
             <Text style={styles.emptyText}>
-              Record your first hockey shot to see it here
+              Record your first hockey shot to see it here with advanced playback controls
             </Text>
+            <TouchableOpacity 
+              style={styles.emptyButton}
+              onPress={handleRecordNew}
+            >
+              <Text style={styles.emptyButtonText}>📹 Record First Shot</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
 
-      <View style={styles.controls}>
-        <TouchableOpacity 
-          style={styles.primaryButton}
-          onPress={handleRecordNew}
-        >
-          <Text style={styles.primaryButtonText}>📹 Record New Shot</Text>
-        </TouchableOpacity>
-        
-        {videoUri && (
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>📤 Share Video</Text>
+      {videoUri && (
+        <View style={styles.bottomActions}>
+          <TouchableOpacity 
+            style={styles.secondaryButton}
+            onPress={handleShare}
+          >
+            <Text style={styles.secondaryButtonText}>📤 Share</Text>
           </TouchableOpacity>
-        )}
-      </View>
+          
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={handleRecordNew}
+          >
+            <Text style={styles.primaryButtonText}>📹 Record New</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -111,58 +181,42 @@ const styles = StyleSheet.create({
   backButton: {
     color: '#0066cc',
     fontSize: 16,
+    fontWeight: '500',
   },
   title: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
   },
-  placeholder: {
-    width: 50,
+  headerAction: {
+    color: '#0066cc',
+    fontSize: 16,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
-    padding: 20,
   },
   videoContainer: {
     flex: 1,
   },
-  videoPlaceholder: {
-    backgroundColor: '#333333',
-    borderRadius: 12,
-    padding: 40,
-    alignItems: 'center',
-    marginBottom: 20,
-    minHeight: 200,
-    justifyContent: 'center',
+  playerContainer: {
+    flex: 1,
+    minHeight: 300,
+    backgroundColor: '#000000',
   },
-  videoPlaceholderText: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  videoPath: {
-    color: '#888888',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  videoPathText: {
-    color: '#ffffff',
-    fontSize: 12,
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
-  analysisContainer: {
+  infoPanel: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 12,
     padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
   },
-  analysisTitle: {
+  infoPanelTitle: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
   },
-  analysisText: {
+  infoText: {
     color: '#888888',
     fontSize: 14,
     lineHeight: 20,
@@ -198,12 +252,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 32,
   },
-  controls: {
+  emptyButton: {
+    backgroundColor: '#0066cc',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+  },
+  emptyButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bottomActions: {
+    flexDirection: 'row',
     padding: 20,
     gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
   },
   primaryButton: {
+    flex: 1,
     backgroundColor: '#0066cc',
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -216,6 +286,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
+    flex: 1,
     backgroundColor: '#333333',
     paddingVertical: 16,
     paddingHorizontal: 32,
