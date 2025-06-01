@@ -1,6 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+// ML-related interfaces for Phase 3
+export interface ShotDetectionResult {
+  shotDetected: boolean;
+  confidence: number;
+  timestamp: number;
+  videoOffset: number; // Time in video (seconds)
+  frameNumber: number;
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  shotType?: 'wrist' | 'slap' | 'snap' | 'backhand';
+}
+
+export interface ShotMarker {
+  id: string;
+  timestamp: number;
+  confidence: number;
+  shotType: string;
+  processed: boolean;
+}
+
 export interface VideoMetadata {
   id: string;
   filename: string;
@@ -11,6 +35,18 @@ export interface VideoMetadata {
   fileSize: number;
   quality: string;
   thumbnail?: string;
+  
+  // New ML fields for Phase 3
+  shotDetections?: ShotDetectionResult[];
+  mlProcessingStatus?: 'pending' | 'processing' | 'complete' | 'error';
+  frameAnalysisData?: {
+    processedFrames: number;
+    totalFrames: number;
+    detectedShots: ShotMarker[];
+    processingStartTime?: number;
+    processingEndTime?: number;
+  };
+  mlVersion?: string; // Track which ML model version was used
 }
 
 export interface VideoSession {
@@ -71,7 +107,7 @@ class VideoStorageService {
       // For now, we'll keep the original path and estimate file size
       const estimatedFileSize = duration * 1000000; // Rough estimate: 1MB per second
       
-      // Create video metadata
+      // Create video metadata with ML fields
       const metadata: VideoMetadata = {
         id: videoId,
         filename,
@@ -81,6 +117,16 @@ class VideoStorageService {
         hasAudio,
         fileSize: estimatedFileSize,
         quality: '1080p',
+        
+        // Initialize ML fields
+        shotDetections: [],
+        mlProcessingStatus: 'pending',
+        frameAnalysisData: {
+          processedFrames: 0,
+          totalFrames: Math.floor(duration * 60), // Assuming 60fps
+          detectedShots: [],
+        },
+        mlVersion: '1.0.0-mock', // Will be updated when real ML is implemented
       };
       
       // Save to index
@@ -91,6 +137,139 @@ class VideoStorageService {
       return metadata;
     } catch (error) {
       console.error('Failed to save video:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save shot detection result to video metadata
+   */
+  async saveShotDetection(videoPath: string, detection: ShotDetectionResult): Promise<void> {
+    try {
+      const metadata = await this.getVideoByPath(videoPath);
+      if (!metadata) {
+        console.warn('Video not found for shot detection:', videoPath);
+        return;
+      }
+      
+      const shotDetections = metadata.shotDetections || [];
+      
+      // Add new detection with unique ID
+      const detectionWithId = {
+        ...detection,
+        id: `shot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      };
+      
+      shotDetections.push(detection);
+      
+      // Update metadata
+      const updatedMetadata: VideoMetadata = {
+        ...metadata,
+        shotDetections,
+        mlProcessingStatus: 'processing',
+      };
+      
+      await this.saveMetadata(videoPath, updatedMetadata);
+      console.log('Shot detection saved:', detection.shotType, detection.confidence);
+    } catch (error) {
+      console.error('Error saving shot detection:', error);
+    }
+  }
+  
+  /**
+   * Update ML processing status for a video
+   */
+  async updateMLProcessingStatus(
+    videoPath: string, 
+    status: VideoMetadata['mlProcessingStatus'],
+    analysisData?: Partial<VideoMetadata['frameAnalysisData']>
+  ): Promise<void> {
+    try {
+      const metadata = await this.getVideoByPath(videoPath);
+      if (!metadata) {
+        console.warn('Video not found for ML status update:', videoPath);
+        return;
+      }
+      
+      const currentFrameAnalysisData = metadata.frameAnalysisData || {
+        processedFrames: 0,
+        totalFrames: Math.floor(metadata.duration * 60),
+        detectedShots: [],
+      };
+      
+      const updatedMetadata: VideoMetadata = {
+        ...metadata,
+        mlProcessingStatus: status,
+        frameAnalysisData: {
+          processedFrames: analysisData?.processedFrames ?? currentFrameAnalysisData.processedFrames,
+          totalFrames: analysisData?.totalFrames ?? currentFrameAnalysisData.totalFrames,
+          detectedShots: analysisData?.detectedShots ?? currentFrameAnalysisData.detectedShots,
+          processingStartTime: 
+            status === 'processing' && !currentFrameAnalysisData.processingStartTime 
+              ? Date.now() 
+              : currentFrameAnalysisData.processingStartTime,
+          processingEndTime: 
+            status === 'complete' 
+              ? Date.now() 
+              : currentFrameAnalysisData.processingEndTime,
+        },
+      };
+      
+      await this.saveMetadata(videoPath, updatedMetadata);
+      console.log('ML processing status updated:', status);
+    } catch (error) {
+      console.error('Error updating ML processing status:', error);
+    }
+  }
+  
+  /**
+   * Get videos that have shot detections
+   */
+  async getVideosWithShotDetections(): Promise<VideoMetadata[]> {
+    const allVideos = await this.getAllVideos();
+    return allVideos.filter(video => 
+      video.shotDetections && 
+      video.shotDetections.length > 0
+    );
+  }
+  
+  /**
+   * Get ML processing statistics
+   */
+  async getMLProcessingStats(): Promise<{
+    totalVideos: number;
+    processedVideos: number;
+    pendingVideos: number;
+    totalShotsDetected: number;
+  }> {
+    const allVideos = await this.getAllVideos();
+    
+    return {
+      totalVideos: allVideos.length,
+      processedVideos: allVideos.filter(v => v.mlProcessingStatus === 'complete').length,
+      pendingVideos: allVideos.filter(v => v.mlProcessingStatus === 'pending').length,
+      totalShotsDetected: allVideos.reduce((total, video) => 
+        total + (video.shotDetections?.length || 0), 0
+      ),
+    };
+  }
+  
+  /**
+   * Save metadata to storage
+   */
+  private async saveMetadata(videoPath: string, metadata: VideoMetadata): Promise<void> {
+    try {
+      const videos = await this.getAllVideos();
+      const videoIndex = videos.findIndex(v => v.path === videoPath);
+      
+      if (videoIndex >= 0) {
+        videos[videoIndex] = metadata;
+        await AsyncStorage.setItem(STORAGE_KEYS.VIDEOS_INDEX, JSON.stringify(videos));
+      } else {
+        console.warn('Video not found in index for metadata update:', videoPath);
+      }
+    } catch (error) {
+      console.error('Failed to save metadata:', error);
       throw error;
     }
   }
