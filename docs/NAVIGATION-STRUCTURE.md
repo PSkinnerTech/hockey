@@ -1,179 +1,280 @@
-# Smart Hockey Coach - Navigation Structure
+# Smart Hockey Coach - Navigation Structure (Updated January 2025)
 
 ## Overview
 
-The Smart Hockey Coach app uses a simple yet effective stack-based navigation structure with three main screens optimized for the hockey shot analysis workflow.
+The Smart Hockey Coach app uses React Navigation Stack Navigator with three main screens optimized for the hockey recording and playback workflow. This document reflects the current Phase 2 implementation and planned Phase 3-4 enhancements.
 
-## Navigation Architecture
+## Navigation Architecture (✅ Phase 2 Implementation)
 
 ### Stack Navigator
-- **Type**: React Navigation Stack Navigator
-- **Root Container**: NavigationContainer in `app/_layout.tsx`
-- **Navigator**: RootNavigator in `src/navigation/RootNavigator.tsx`
+- **Type**: React Navigation Stack Navigator (@react-navigation/stack v7.3.3)
+- **Root Container**: NavigationContainer in `App.tsx`
+- **Navigator**: Stack.Navigator with three screens
+- **Safe Area**: react-native-safe-area-context integration
 
-### Screen Flow
+### Current Screen Flow (Phase 2)
 ```
-Home → Recording → Analysis
-  ↑        ↓         ↓
-  ←────────┴─────────┘
+HomeScreen → CameraScreen → PlaybackScreen
+     ↑           ↓              ↓
+     ←───────────┴──────────────┘
 ```
 
-## Screen Definitions
+## Screen Definitions (Current Implementation)
 
-### 1. HomeScreen (`src/screens/HomeScreen.tsx`)
+### 1. HomeScreen (`src/screens/HomeScreen.tsx`) ✅
 **Route**: `Home` (no parameters)
 
-**Features**:
-- App branding and welcome message
-- Large "Start Recording" CTA button
-- Quick stats display (total shots, best accuracy, sessions)
-- Recent shots list with thumbnails (FlashList)
+**Current Features (Phase 2)**:
+- Hockey-themed welcome interface
+- "Record Shot" button (navigates to Camera)
+- "View Recordings" button (navigates to Playback)
+- Professional sports app design
+- Safe area handling
+
+**Future Features (Phase 3-4)**:
+- Quick stats display (total shots, accuracy, sessions)
+- Recent shots list with thumbnails
 - MMKV cached data for offline performance
 
 **Navigation**:
-- → Recording: Taps "Start Recording" button
-- → Analysis: Taps on recent shot thumbnail
+- → Camera: Taps "Record Shot" button
+- → Playback: Taps "View Recordings" button
 
-### 2. RecordingScreen (`src/screens/RecordingScreen.tsx`)
-**Route**: `Recording` (optional `sessionId?: string`)
+### 2. CameraScreen (`src/screens/CameraScreen.tsx`) ✅
+**Route**: `Camera` (no parameters currently)
 
-**Features**:
-- Full-screen camera view with CameraView
-- ML overlay grid for shot guidance
-- Real-time shot detection indicator
-- Recording controls (start/stop with visual feedback)
-- Timer and duration display
-- Camera flip and overlay toggle
+**Current Features (Phase 2)**:
+- VisionCamera integration with device detection
+- Camera permissions handling (camera + microphone)
+- 60fps video recording at 1080p
+- Hockey shot guidelines (center circle overlay)
+- Recording controls with REC indicator animation
+- Visual feedback during recording
+- Back navigation to Home
+
+**Future Features (Phase 3)**:
+- Real-time ML shot detection overlay
+- Frame processor integration
+- Shot detection indicator
 - Custom back handler during recording
+- Session management
 
 **Navigation**:
-- ← Home: Back button or custom back handler
-- → Analysis: Automatic after recording completion
+- ← Home: Stack back navigation
+- → Playback: Manual navigation after recording (future automatic)
 
-### 3. AnalysisScreen (`src/screens/AnalysisScreen.tsx`)
-**Route**: `Analysis` (required `shotId: string`, `videoUri: string`)
+### 3. PlaybackScreen (`src/screens/PlaybackScreen.tsx`) ✅
+**Route**: `Playback` (no parameters currently)
 
-**Features**:
+**Current Features (Phase 2)**:
+- Video library interface
+- List of recorded videos with file paths
+- Basic video information display
+- Navigation back to Home
+
+**Future Features (Phase 2 Week 2)**:
 - Video playback with native controls
-- Progressive feedback system (3 stages):
-  1. Instant detection (< 500ms)
-  2. Fast analysis (< 3s)
-  3. Full analysis (< 15s)
-- Technique scoring and feedback
-- AI insights from analysis
+- Slow-motion playback for technique analysis
+- Video file management (delete, share)
+
+**Future Features (Phase 4)**:
+- Progressive analysis feedback system
+- AI insights and technique scoring
 - Share functionality
-- Action buttons (new recording, share, home)
 
 **Navigation**:
 - ← Home: "Back to Home" button
-- → Recording: "Record Another Shot" button
+- → Camera: "Record Another Shot" button (future)
 
-## Type Safety
+## Type Safety (✅ Implemented)
 
 ### Navigation Types (`src/types/navigation.ts`)
 ```typescript
+// Current implementation
 export type RootStackParamList = {
   Home: undefined;
-  Recording: { sessionId?: string } | undefined;
-  Analysis: { shotId: string; videoUri: string };
+  Camera: undefined;
+  Playback: undefined;
+};
+
+// Future Phase 3 expansion
+export type RootStackParamList = {
+  Home: undefined;
+  Camera: { sessionId?: string } | undefined;
+  Playback: { videoUri?: string; shotId?: string } | undefined;
 };
 ```
 
-### Typed Hooks (`src/hooks/useTypedNavigation.ts`)
-- `useTypedNavigation()`: Type-safe navigation hook
-- `useTypedRoute<T>()`: Type-safe route params hook
+### Typed Navigation Hooks
+```typescript
+// Current implementation using React Navigation hooks
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
+const navigation = useNavigation<NavigationProp>();
+```
+
+**Future Custom Hooks (Phase 3)**:
+- `useTypedNavigation()`: Enhanced type-safe navigation
+- `useTypedRoute<T>()`: Type-safe route params
 - `useNavigationHelpers()`: Pre-built navigation functions
-- `useCustomBackHandler()`: Custom back button handling
 
-## Design System Integration
+## Current Navigation Implementation
 
-### Theme Integration
-- Uses `getThemeColors()` for dark/light mode support
-- Consistent spacing from `src/theme/spacing.ts`
-- Typography system for text styling
-- Shadow system for depth
+### Stack Navigator Setup (`App.tsx`)
+```typescript
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-### Performance Optimizations
-- `React.memo()` on all screen components
-- FlashList for efficient list rendering
-- Lazy loading considerations for Analysis screen
-- Proper cleanup in useEffect hooks
+const Stack = createStackNavigator<RootStackParamList>();
 
-## Navigation Features
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName="Home"
+          screenOptions={{ headerShown: false }}
+        >
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Camera" component={CameraScreen} />
+          <Stack.Screen name="Playback" component={PlaybackScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+```
 
-### Screen Options
-- **Home**: No header (custom branding)
-- **Recording**: No header (full-screen camera)
-- **Analysis**: Modal presentation with header
+### Screen Components Structure
+- **HomeScreen**: Simple welcome interface with navigation buttons
+- **CameraScreen**: VisionCamera with recording functionality
+- **PlaybackScreen**: Video library with file listings
 
-### Gestures & Transitions
-- Smooth horizontal slide transitions
-- Gesture-enabled navigation
-- Disabled gestures during recording
-- Custom back handling for Recording screen
+## Performance Optimizations (Current)
 
-### Deep Linking Ready
-- Type-safe parameter structure
-- Supports future deep link implementation
-- Proper parameter validation
+### React Native Best Practices ✅
+- **No Headers**: `headerShown: false` for full-screen experience
+- **Safe Areas**: Proper safe area handling on all screens
+- **Navigation**: Smooth stack transitions with gesture support
+- **Memory**: Proper component cleanup and state management
+
+### Future Optimizations (Phase 3)
+- `React.memo()` on screen components
+- FlashList for efficient video library rendering
+- Lazy loading for analysis features
+- MMKV for performance state caching
 
 ## State Management Integration
 
-### MMKV Storage
-- Recent shots cached locally
-- User statistics persistence
-- Performance metrics tracking
+### Current (Phase 2) ✅
+- **React State**: useState/useEffect for component state
+- **VisionCamera State**: useCameraDevice, useCameraPermission
+- **Simple Navigation**: Basic stack navigation
 
-### Zustand Stores
-- User state management
-- Session state tracking
-- UI state (theme, loading states)
+### Future (Phase 3-4)
+```typescript
+// Planned Zustand stores
+- Recording state management
+- Video library state
+- Analysis results caching
+- User preferences and settings
+```
 
-## Error Handling
+## Camera Integration (✅ Current)
 
-### Camera Permissions
-- Permission flow integration
+### VisionCamera Setup
+```typescript
+// Current implementation
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+
+const device = useCameraDevice('back');
+const { hasPermission, requestPermission } = useCameraPermission();
+```
+
+### Permissions Flow ✅
+- Camera permission request on CameraScreen mount
+- Microphone permission via react-native-permissions
 - Graceful permission denied handling
-- Settings redirect for denied permissions
+- Settings redirect for blocked permissions
 
-### Navigation Errors
-- Fallback navigation to Home
-- Error boundaries from Expo Router
-- Loading states during navigation
+## Error Handling (Current)
 
-## Testing Checklist
+### Navigation Errors ✅
+- Stack navigation error boundaries
+- Fallback to Home screen on errors
+- Proper loading states
 
-### Navigation Flows ✅
-- [x] Home → Recording → Analysis → Home
-- [x] Home → Recording → Home (back button)
-- [x] Analysis → Recording (new shot)
-- [x] Deep navigation parameter passing
+### Camera Errors ✅
+- Permission denied handling
+- Device detection fallbacks
+- Recording failure recovery
 
-### Performance ✅
-- [x] No memory leaks in navigation
-- [x] Smooth 60fps transitions
-- [x] Proper component cleanup
-- [x] Efficient re-renders
+## Testing Status
 
-### Platform Support ✅
-- [x] iOS navigation behavior
-- [x] Android back button handling
-- [x] Screen rotation support
-- [x] Safe area handling
+### Navigation Flows ✅ (Phase 2 Complete)
+- [x] Home → Camera → Home
+- [x] Home → Playback → Home
+- [x] Stack navigation with back gestures
+- [x] Safe area handling on all screens
+
+### Camera Integration ✅ (Phase 2 Complete)
+- [x] VisionCamera device detection
+- [x] Permission request flow
+- [x] 60fps recording functionality
+- [x] Recording state management
+
+### Future Testing (Phase 2 Week 2)
+- [ ] Video playback controls
+- [ ] Video library management
+- [ ] File deletion and sharing
+
+## Roadmap Integration
+
+### ✅ Phase 2 Week 1 Complete
+- React Navigation stack setup
+- HomeScreen with hockey-themed UI
+- CameraScreen with VisionCamera integration
+- PlaybackScreen with video library interface
+- TypeScript navigation types
+- iOS deployment and testing
+
+### 🎯 Phase 2 Week 2 (Next)
+- Video playback component with controls
+- Slow-motion playback capabilities
+- Enhanced video library management
+- File operations (delete, share, metadata)
+
+### 🔄 Phase 3 (Weeks 3-4)
+- Frame processor navigation integration
+- ML overlay components
+- Real-time shot detection UI
+- Enhanced state management with Zustand
+
+### 🔄 Phase 4 (Weeks 5-6)
+- Analysis results navigation
+- Progressive feedback UI
+- Backend integration navigation
+- Advanced sharing and export features
 
 ## Future Enhancements
 
-### Planned Features
-- Deep linking implementation
+### Planned Navigation Features (Phase 3-4)
+- Deep linking for video sharing
 - Navigation state persistence
-- Advanced gesture navigation
-- Screen transition customization
+- Modal presentations for analysis
+- Custom transition animations
 
-### Performance Monitoring
+### Performance Monitoring (Phase 4)
 - Navigation timing metrics
-- Screen render performance
-- Memory usage tracking
+- Screen render performance tracking
+- Memory usage monitoring
 
 ---
 
-The navigation structure is optimized for the hockey analysis workflow while maintaining excellent performance and user experience.
+**Current Status**: Phase 2 Week 1 Complete ✅  
+**Navigation**: React Navigation Stack with 3 screens  
+**Framework**: React Native 0.79.2 + TypeScript  
+**Next Milestone**: Video Playback (Phase 2 Week 2)
