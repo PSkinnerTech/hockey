@@ -25,8 +25,24 @@ xcode >= 14.0
 # Google Cloud CLI
 gcloud CLI
 gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project "$GCP_PROJECT_ID"
 ```
+
+### Secure Credentials Setup
+
+**IMPORTANT**: We use a secure environment variable approach for all credentials. Do NOT hardcode credentials in any files.
+
+Before proceeding with deployment, set up your credentials:
+
+```bash
+# Run the secure setup script
+./scripts/setup-deployment-env.sh
+
+# For deployments, use the secure deployment script
+./scripts/secure-deploy.sh --env production --ios --android --backend
+```
+
+For detailed information on secure credentials management, see [SECURE-CREDENTIALS.md](SECURE-CREDENTIALS.md).
 
 ## Environment Configuration
 
@@ -310,8 +326,8 @@ xcodebuild -exportArchive \
 xcrun altool --upload-app \
   -f ./build/SmartHockeyCoach.ipa \
   -t ios \
-  -u YOUR_APPLE_ID \
-  -p YOUR_APP_PASSWORD
+  -u "$APPLE_ID" \
+  -p "$APPLE_APP_PASSWORD"
 ```
 
 ### 2. Android Deployment
@@ -330,16 +346,17 @@ android {
     
     signingConfigs {
         release {
-            storeFile file(MYAPP_RELEASE_STORE_FILE)
-            storePassword MYAPP_RELEASE_STORE_PASSWORD
-            keyAlias MYAPP_RELEASE_KEY_ALIAS
-            keyPassword MYAPP_RELEASE_KEY_PASSWORD
+            storeFile file('../keystores/release.keystore')
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            keyAlias System.getenv('ANDROID_KEY_ALIAS')
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD')
         }
     }
     
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            signingConfig System.getenv('ANDROID_KEYSTORE_PASSWORD') != null ? 
+                signingConfigs.release : signingConfigs.debug
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
